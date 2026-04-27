@@ -8,11 +8,13 @@ export class ActivitySkillRequirement {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true, min: 1, max: 4 })
+  @Prop({ required: true, min: 1, max: 5 })
   level: number;
 }
 
-export const ActivitySkillRequirementSchema = SchemaFactory.createForClass(ActivitySkillRequirement);
+export const ActivitySkillRequirementSchema = SchemaFactory.createForClass(
+  ActivitySkillRequirement,
+);
 
 @Schema({ _id: false })
 export class ActivityProof {
@@ -88,7 +90,9 @@ export class ActivityEnrollment {
   enrolledAt: string;
 }
 
-export const ActivityEnrollmentSchema = SchemaFactory.createForClass(ActivityEnrollment);
+export const ActivityEnrollmentSchema = SchemaFactory.createForClass(
+  ActivityEnrollment,
+);
 
 @Schema({ timestamps: true })
 export class Activity {
@@ -98,7 +102,10 @@ export class Activity {
   @Prop({ default: '' })
   description: string;
 
-  @Prop({ required: true, enum: ['Upskilling', 'Expertise', 'Development'] })
+  @Prop({
+    default: 'Upskilling',
+    enum: ['Upskilling', 'Expertise', 'Development'],
+  })
   context: string;
 
   @Prop({ default: '' })
@@ -110,10 +117,13 @@ export class Activity {
   @Prop({ type: [ActivitySkillRequirementSchema], default: [] })
   requiredSkills: ActivitySkillRequirement[];
 
-  @Prop({ default: 0, min: 0 })
+  @Prop({ default: 10, min: 0 })
   seats: number;
 
-  @Prop({ default: 'Draft', enum: ['Draft', 'Validated', 'In Progress', 'Completed'] })
+  @Prop({
+    default: 'Draft',
+    enum: ['Draft', 'Validated', 'In Progress', 'Completed'],
+  })
   status: string;
 
   @Prop({ default: '' })

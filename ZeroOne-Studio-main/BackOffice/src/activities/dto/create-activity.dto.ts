@@ -3,6 +3,7 @@ import {
   ArrayMaxSize,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsIn,
   IsInt,
   IsOptional,
@@ -18,10 +19,10 @@ export class ActivitySkillRequirementDto {
   @IsString()
   name: string;
 
-  @ApiProperty({ example: 3, minimum: 1, maximum: 4 })
+  @ApiProperty({ example: 3, minimum: 1, maximum: 5 })
   @IsInt()
   @Min(1)
-  @Max(4)
+  @Max(5)
   level: number;
 }
 
@@ -30,14 +31,19 @@ export class CreateActivityDto {
   @IsString()
   title: string;
 
-  @ApiPropertyOptional({ example: 'Master advanced React concepts and design patterns.' })
+  @ApiPropertyOptional({
+    example: 'Master advanced React concepts and design patterns.',
+  })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiProperty({ enum: ['Upskilling', 'Expertise', 'Development'] })
+  @ApiProperty({
+    enum: ['Upskilling', 'Expertise', 'Development'],
+    example: 'Upskilling',
+  })
   @IsIn(['Upskilling', 'Expertise', 'Development'])
-  context: 'Upskilling' | 'Expertise' | 'Development';
+  context: 'Upskilling' | 'Expertise' | 'Development' = 'Upskilling';
 
   @ApiPropertyOptional({ example: 'Engineering' })
   @IsOptional()
@@ -49,7 +55,11 @@ export class CreateActivityDto {
   @IsBoolean()
   requiresManagerApproval?: boolean;
 
-  @ApiPropertyOptional({ type: [ActivitySkillRequirementDto] })
+  @ApiPropertyOptional({
+    type: [ActivitySkillRequirementDto],
+    minItems: 0,
+    example: [],
+  })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(20)
@@ -57,23 +67,26 @@ export class CreateActivityDto {
   @Type(() => ActivitySkillRequirementDto)
   requiredSkills?: ActivitySkillRequirementDto[];
 
-  @ApiProperty({ example: 20 })
+  @ApiProperty({ example: 10 })
   @IsInt()
   @Min(0)
-  seats: number;
+  seats: number = 10;
 
-  @ApiPropertyOptional({ enum: ['Draft', 'Validated', 'In Progress', 'Completed'] })
+  @ApiPropertyOptional({
+    enum: ['Draft', 'Validated', 'In Progress', 'Completed'],
+    example: 'Draft',
+  })
   @IsOptional()
   @IsIn(['Draft', 'Validated', 'In Progress', 'Completed'])
   status?: 'Draft' | 'Validated' | 'In Progress' | 'Completed';
 
   @ApiPropertyOptional({ example: '2026-04-01' })
   @IsOptional()
-  @IsString()
+  @IsDateString()
   startDate?: string;
 
   @ApiPropertyOptional({ example: '2026-06-01' })
   @IsOptional()
-  @IsString()
+  @IsDateString()
   endDate?: string;
 }

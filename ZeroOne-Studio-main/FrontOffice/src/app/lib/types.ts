@@ -45,8 +45,10 @@ export interface Employee {
   activitiesCount?: number;
   bio?: string;
   joinedAt?: string;
+  specializedSkills?: string[];
   education?: EducationItem[];
   certifications?: CertificationItem[];
+  role?: UserRole;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -131,6 +133,10 @@ export interface Recommendation {
   employeeName: string;
   activityId: string;
   activityTitle: string;
+  activitySeats: number;
+  occupiedSeats: number;
+  availableSeats: number;
+  eligibleEmployeesCount: number;
   score: number;
   matchedSkills: string[];
   missingSkills: string[];
@@ -160,6 +166,26 @@ export interface UserSettings {
   pushNotifications: boolean;
   activityNotifications: boolean;
   recommendationNotifications: boolean;
+}
+
+export interface DepartmentMember {
+  employeeId: string;
+  employeeName: string;
+  position?: string;
+  specializedSkills?: string[];
+}
+
+export interface Department {
+  _id: string;
+  name: string;
+  description?: string;
+  managerId?: string;
+  managerName?: string;
+  employeeCount?: number;
+  skills?: string[];
+  members?: DepartmentMember[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface EmployeeEvolutionResponse {

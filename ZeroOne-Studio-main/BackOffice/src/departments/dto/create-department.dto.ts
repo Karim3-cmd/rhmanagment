@@ -1,12 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString } from 'class-validator';
 
-export class CreateSkillDto {
-  @ApiProperty({ example: 'React' })
+export class CreateDepartmentDto {
+  @ApiProperty({ example: 'Engineering' })
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({ example: 'JavaScript framework for building UIs' })
+  @ApiPropertyOptional({ example: 'Software development team' })
   @IsOptional()
   @IsString()
   description?: string;

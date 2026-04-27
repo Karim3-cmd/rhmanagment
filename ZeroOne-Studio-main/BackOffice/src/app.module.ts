@@ -4,6 +4,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ActivitiesModule } from './activities/activities.module';
+import { DepartmentsModule } from './departments/departments.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AuthModule } from './auth/auth.module';
 import { EmployeesModule } from './employees/employees.module';
@@ -12,6 +13,7 @@ import { RecommendationsModule } from './recommendations/recommendations.module'
 import { SettingsModule } from './settings/settings.module';
 import { SkillsModule } from './skills/skills.module';
 import { UsersModule } from './users/users.module';
+import { AIModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -29,10 +31,12 @@ import { UsersModule } from './users/users.module';
     EmployeesModule,
     SkillsModule,
     ActivitiesModule,
+    DepartmentsModule,
     RecommendationsModule,
     AnalyticsModule,
     NotificationsModule,
     SettingsModule,
+    AIModule,
   ],
   controllers: [AppController],
   providers: [AppService],

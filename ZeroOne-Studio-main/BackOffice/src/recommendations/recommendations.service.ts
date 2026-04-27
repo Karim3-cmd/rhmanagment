@@ -21,6 +21,48 @@ export class RecommendationsService {
     private readonly skillModel: Model<SkillDocument>,
   ) { }
 
+  private async syncSpecializedSkillsAssignments() {
+    const [employees, skills] = await Promise.all([
+      this.employeeModel.find().lean(),
+      this.skillModel.find(),
+    ]);
+
+    const skillByName = new Map(
+      skills.map((skill) => [skill.name.toLowerCase().trim(), skill]),
+    );
+
+    for (const employee of employees) {
+      for (const specializedSkill of employee.specializedSkills || []) {
+        const normalized = specializedSkill.toLowerCase().trim();
+        const skill = skillByName.get(normalized);
+        if (!skill) continue;
+
+        const alreadyAssigned = (skill.assignments || []).some(
+          (item: any) => item.employeeId.toString() === employee._id.toString(),
+        );
+
+        if (alreadyAssigned) continue;
+
+        skill.assignments.push({
+          employeeId: employee._id,
+          employeeName: employee.fullName,
+          level: 2,
+          notes: 'Auto-assigned from employee specialized skills',
+          yearsOfExperience: employee.yearsOfExperience || 0,
+          validated: false,
+          validatedBy: 'System',
+        } as any);
+      }
+    }
+
+    await Promise.all(skills.map((skill) => skill.save()));
+  }
+
+  private async autoEnrollFromRecommendations(_items: Array<any>) {
+    // Auto-enrollment is disabled.
+    // Recommendations are generated for display only; enrollment is done manually.
+  }
+
   private async computeRecommendations() {
     const [employees, activities, skills] = await Promise.all([
       this.employeeModel.find().lean(),
@@ -41,6 +83,12 @@ export class RecommendationsService {
 
     return employees.flatMap((employee) => {
       const ownedSkills = employeeSkillMap.get(employee._id.toString()) || new Map<string, any>();
+      const specializedSkills = new Set(
+        (employee.specializedSkills || []).map((skill: string) =>
+          skill.toLowerCase().trim(),
+        ),
+      );
+
       return activities.map((activity) => {
         const matchedSkills: string[] = [];
         const missingSkills: string[] = [];
@@ -50,7 +98,17 @@ export class RecommendationsService {
         for (const requirement of activity.requiredSkills || []) {
           target += requirement.level * 25;
           const assignment = ownedSkills.get(requirement.name.toLowerCase());
+          const hasSpecializedSkill = specializedSkills.has(
+            requirement.name.toLowerCase(),
+          );
           const level = assignment?.level || 0;
+
+          if (!assignment && hasSpecializedSkill) {
+            matchedSkills.push(`${requirement.name} (specialized profile)`);
+            earned += requirement.level * 22;
+            continue;
+          }
+
           if (level >= requirement.level) {
             matchedSkills.push(requirement.name);
             earned += requirement.level * 25;
@@ -73,11 +131,19 @@ export class RecommendationsService {
           ? 50 + departmentBonus + certificationBonus
           : Math.max(0, Math.min(100, Math.round((earned / target) * 65 + completionBonus + experienceBonus + certificationBonus + departmentBonus)));
 
+        const occupiedSeats = (activity.enrollments || []).length;
+        const activitySeats = Math.max(activity.seats || 0, 0);
+        const availableSeats = Math.max(activitySeats - occupiedSeats, 0);
+
         return {
           employeeId: employee._id,
           employeeName: employee.fullName,
           activityId: activity._id,
           activityTitle: activity.title,
+          activitySeats,
+          occupiedSeats,
+          availableSeats,
+          eligibleEmployeesCount: 0,
           score,
           matchedSkills,
           missingSkills,
@@ -92,11 +158,27 @@ export class RecommendationsService {
   }
 
   async refresh() {
+    await this.syncSpecializedSkillsAssignments();
     const computed = await this.computeRecommendations();
+    const eligibleByActivity = new Map<string, number>();
+
+    for (const item of computed) {
+      if (item.score < 60) continue;
+      const key = item.activityId.toString();
+      eligibleByActivity.set(key, (eligibleByActivity.get(key) || 0) + 1);
+    }
+
+    const enriched = computed.map((item) => ({
+      ...item,
+      eligibleEmployeesCount: eligibleByActivity.get(item.activityId.toString()) || 0,
+    }));
+
+    // Auto-enrollment disabled per user request
+
     const existing = await this.recommendationModel.find().lean();
     const statusMap = new Map(existing.map((item) => [`${item.employeeId.toString()}_${item.activityId.toString()}`, item.status]));
     await this.recommendationModel.deleteMany({});
-    const payload = computed.map((item) => ({ ...item, status: statusMap.get(`${item.employeeId.toString()}_${item.activityId.toString()}`) || 'Open' }));
+    const payload = enriched.map((item) => ({ ...item, status: statusMap.get(`${item.employeeId.toString()}_${item.activityId.toString()}`) || 'Open' }));
     if (payload.length) await this.recommendationModel.insertMany(payload);
     return this.findAll({});
   }

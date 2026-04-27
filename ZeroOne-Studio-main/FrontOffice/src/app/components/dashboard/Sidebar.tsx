@@ -8,6 +8,7 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Building2,
 } from 'lucide-react';
 import { ViewType } from './Dashboard';
 
@@ -49,6 +50,12 @@ export function Sidebar({
       label: 'Skills',
       icon: <Brain className="w-5 h-5" />,
       roles: ['HR', 'Manager', 'Employee'],
+    },
+    {
+      id: 'departments',
+      label: 'Departments',
+      icon: <Building2 className="w-5 h-5" />,
+      roles: ['HR', 'Manager'],
     },
     {
       id: 'activities',

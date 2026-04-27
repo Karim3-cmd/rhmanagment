@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { randomBytes, scryptSync } from 'crypto';
 import { Model } from 'mongoose';
@@ -11,7 +15,8 @@ import { User, UserDocument } from '../users/schemas/user.schema';
 @Injectable()
 export class EmployeesService {
   constructor(
-    @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
+    @InjectModel(Employee.name)
+    private readonly employeeModel: Model<EmployeeDocument>,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
   ) {}
 
@@ -22,24 +27,28 @@ export class EmployeesService {
   }
 
   async create(dto: CreateEmployeeDto) {
-    const exists = await this.employeeModel.findOne({ email: dto.email.toLowerCase() });
+    const exists = await this.employeeModel.findOne({
+      email: dto.email.toLowerCase(),
+    });
     if (exists) throw new BadRequestException('Employee email already exists');
+
+    const normalizedEmail = dto.email.toLowerCase();
 
     const employee = await this.employeeModel.create({
       ...dto,
-      email: dto.email.toLowerCase(),
+      email: normalizedEmail,
       education: dto.education || [],
       certifications: dto.certifications || [],
       joinedAt: dto.joinedAt || '',
     });
 
-    // Create corresponding user account for notifications
-    const userExists = await this.userModel.findOne({ email: dto.email.toLowerCase() });
+    // Automatically create corresponding login account for employee
+    const userExists = await this.userModel.findOne({ email: normalizedEmail });
     if (!userExists) {
       const defaultPassword = this.hashPassword('password123');
       await this.userModel.create({
         name: dto.fullName,
-        email: dto.email.toLowerCase(),
+        email: normalizedEmail,
         passwordHash: defaultPassword,
         role: 'Employee',
         department: dto.department || '',
@@ -61,7 +70,9 @@ export class EmployeesService {
         { department: { $regex: query.search, $options: 'i' } },
       ];
     }
-    if (query.department && query.department !== 'All') filter.department = query.department;
+    if (query.department && query.department !== 'All') {
+      filter.department = query.department;
+    }
 
     const items = await this.employeeModel.find(filter).sort({ createdAt: -1 });
     return { total: items.length, items };
@@ -74,13 +85,51 @@ export class EmployeesService {
   }
 
   async update(id: string, dto: UpdateEmployeeDto) {
+    const previous = await this.employeeModel.findById(id);
+    if (!previous) throw new NotFoundException('Employee not found');
+
     if (dto.email) {
-      const exists = await this.employeeModel.findOne({ _id: { $ne: id }, email: dto.email.toLowerCase() });
-      if (exists) throw new BadRequestException('Another employee already uses this email');
+      const exists = await this.employeeModel.findOne({
+        _id: { $ne: id },
+        email: dto.email.toLowerCase(),
+      });
+      if (exists) {
+        throw new BadRequestException(
+          'Another employee already uses this email',
+        );
+      }
       dto.email = dto.email.toLowerCase();
     }
-    const employee = await this.employeeModel.findByIdAndUpdate(id, dto, { new: true, runValidators: true });
+
+    const employee = await this.employeeModel.findByIdAndUpdate(id, dto, {
+      new: true,
+      runValidators: true,
+    });
     if (!employee) throw new NotFoundException('Employee not found');
+
+    const previousEmail = previous.email.toLowerCase();
+    const currentEmail = employee.email.toLowerCase();
+    const existingUser = await this.userModel.findOne({ email: previousEmail });
+
+    if (existingUser) {
+      existingUser.name = employee.fullName;
+      existingUser.email = currentEmail;
+      existingUser.department = employee.department || '';
+      existingUser.jobTitle = employee.position || '';
+      await existingUser.save();
+    } else {
+      const defaultPassword = this.hashPassword('password123');
+      await this.userModel.create({
+        name: employee.fullName,
+        email: currentEmail,
+        passwordHash: defaultPassword,
+        role: 'Employee',
+        department: employee.department || '',
+        jobTitle: employee.position || '',
+        isActive: true,
+      });
+    }
+
     return employee;
   }
 

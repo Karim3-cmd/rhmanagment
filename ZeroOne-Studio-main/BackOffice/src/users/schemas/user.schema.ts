@@ -6,6 +6,9 @@ export type UserRole = 'HR' | 'Manager' | 'Employee';
 
 @Schema({ timestamps: true })
 export class User {
+  @Prop({ required: true })
+  _id: string;
+
   @Prop({ required: true, trim: true })
   name: string;
 

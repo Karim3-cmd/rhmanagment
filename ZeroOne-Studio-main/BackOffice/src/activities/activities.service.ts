@@ -68,7 +68,9 @@ export class ActivitiesService {
     const created = await this.activityModel.create({
       ...dto,
       description: dto.description || '',
+      context: dto.context || 'Upskilling',
       requiredSkills: dto.requiredSkills || [],
+      seats: dto.seats || 10,
       status: dto.status || 'Draft',
       targetDepartment: dto.targetDepartment || '',
       requiresManagerApproval: dto.requiresManagerApproval || false,
@@ -136,7 +138,7 @@ export class ActivitiesService {
     return { message: 'Activity deleted successfully' };
   }
 
-  async enroll(activityId: string, dto: EnrollActivityDto) {
+  async enroll(activityId: string, dto: EnrollActivityDto, byHR: boolean = false) {
     const activity = await this.activityModel.findById(activityId);
     if (!activity) throw new NotFoundException('Activity not found');
 
@@ -155,12 +157,16 @@ export class ActivitiesService {
       throw new BadRequestException('No seats left for this activity');
     }
 
+    // If HR is assigning, require manager approval
+    const status = byHR ? 'Pending Manager Approval' : 'Approved';
+    const managerDecision = byHR ? 'Awaiting manager approval' : 'Auto approved (self-enrollment)';
+
     activity.enrollments.push({
       employeeId: new Types.ObjectId(dto.employeeId),
       employeeName: employee.fullName,
       notes: dto.notes || '',
-      status: activity.requiresManagerApproval ? 'Pending Approval' : 'Approved',
-      managerDecision: activity.requiresManagerApproval ? 'Waiting manager review' : 'Auto approved',
+      status,
+      managerDecision,
       enrolledAt: new Date().toISOString(),
       progress: 0,
       proofs: [],
@@ -168,6 +174,96 @@ export class ActivitiesService {
 
     await activity.save();
     await this.syncEmployeeActivityCounts();
+
+    // If HR assigned, send notification to employee's manager
+    if (byHR) {
+      await this.notifyManagerOfPendingApproval(activity, employee);
+    }
+
+    return this.mapActivity(activity);
+  }
+
+  private async notifyManagerOfPendingApproval(activity: ActivityDocument, employee: EmployeeDocument) {
+    // Find the manager of the employee's department
+    const manager = await this.userModel.findOne({
+      department: employee.department,
+      role: 'Manager',
+      isActive: true,
+    });
+
+    if (manager) {
+      await this.notificationsService.create({
+        userId: manager._id.toString(),
+        title: 'New Activity Assignment Requires Approval',
+        message: `Employee ${employee.fullName} has been assigned to activity "${activity.title}". Please review and approve/reject.`,
+        type: 'info',
+        category: 'Activity',
+        link: `/activities/${activity._id}`,
+      });
+    }
+  }
+
+  async approveEnrollment(activityId: string, employeeId: string, reviewedBy: string, reviewNote?: string, progressWeight: number = 25) {
+    const activity = await this.activityModel.findById(activityId);
+    if (!activity) throw new NotFoundException('Activity not found');
+
+    const enrollment = activity.enrollments.find((item) => item.employeeId.toString() === employeeId);
+    if (!enrollment) throw new NotFoundException('Enrollment not found');
+
+    if (enrollment.status !== 'Pending Manager Approval') {
+      throw new BadRequestException('Enrollment is not pending manager approval');
+    }
+
+    enrollment.status = 'Approved';
+    enrollment.managerDecision = reviewNote || 'Approved by manager';
+    enrollment.reviewedBy = reviewedBy;
+    enrollment.reviewedAt = new Date().toISOString();
+    enrollment.startedAt = new Date().toISOString();
+
+    await activity.save();
+    await this.syncEmployeeActivityCounts();
+
+    // Notify employee
+    await this.notificationsService.create({
+      userId: employeeId,
+      title: 'Activity Assignment Approved',
+      message: `Your assignment to "${activity.title}" has been approved by your manager.`,
+      type: 'info',
+      category: 'Activity',
+      link: `/activities/${activityId}`,
+    });
+
+    return this.mapActivity(activity);
+  }
+
+  async rejectEnrollment(activityId: string, employeeId: string, reviewedBy: string, reviewNote?: string) {
+    const activity = await this.activityModel.findById(activityId);
+    if (!activity) throw new NotFoundException('Activity not found');
+
+    const enrollment = activity.enrollments.find((item) => item.employeeId.toString() === employeeId);
+    if (!enrollment) throw new NotFoundException('Enrollment not found');
+
+    if (enrollment.status !== 'Pending Manager Approval') {
+      throw new BadRequestException('Enrollment is not pending manager approval');
+    }
+
+    enrollment.status = 'Rejected';
+    enrollment.managerDecision = reviewNote || 'Rejected by manager';
+    enrollment.reviewedBy = reviewedBy;
+    enrollment.reviewedAt = new Date().toISOString();
+
+    await activity.save();
+    await this.syncEmployeeActivityCounts();
+
+    // Notify employee
+    await this.notificationsService.create({
+      userId: employeeId,
+      title: 'Activity Assignment Rejected',
+      message: `Your assignment to "${activity.title}" has been rejected by your manager.`,
+      type: 'warning',
+      category: 'Activity',
+      link: `/activities/${activityId}`,
+    });
 
     return this.mapActivity(activity);
   }

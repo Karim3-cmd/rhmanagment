@@ -1,6 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
 
+export type UserRole = 'HR' | 'Manager' | 'Employee';
+
 export type EmployeeDocument = HydratedDocument<Employee>;
 
 @Schema({ _id: false })
@@ -44,8 +46,12 @@ export class Employee {
   @Prop({ default: 0 }) activitiesCount: number;
   @Prop({ default: '' }) bio: string;
   @Prop({ default: '' }) joinedAt: string;
+  @Prop({ type: [String], default: [] }) specializedSkills: string[];
   @Prop({ type: [EducationItemSchema], default: [] }) education: EducationItem[];
   @Prop({ type: [CertificationItemSchema], default: [] }) certifications: CertificationItem[];
+
+  @Prop({ default: 'Employee', enum: ['HR', 'Manager', 'Employee'] })
+  role: UserRole;
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);

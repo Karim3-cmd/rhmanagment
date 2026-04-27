@@ -6,10 +6,10 @@ export class AssignSkillDto {
   @IsString()
   employeeId: string;
 
-  @ApiProperty({ minimum: 1, maximum: 4 })
+  @ApiProperty({ minimum: 1, maximum: 5 })
   @IsInt()
   @Min(1)
-  @Max(4)
+  @Max(5)
   level: number;
 
   @ApiPropertyOptional()

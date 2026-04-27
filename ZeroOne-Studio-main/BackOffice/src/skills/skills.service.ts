@@ -76,7 +76,6 @@ export class SkillsService {
       await this.skillModel.create({
         ...dto,
         description: dto.description || '',
-        trending: dto.trending || false,
       }),
     );
   }
@@ -87,13 +86,8 @@ export class SkillsService {
     if (query.search) {
       filter.$or = [
         { name: { $regex: query.search, $options: 'i' } },
-        { category: { $regex: query.search, $options: 'i' } },
         { description: { $regex: query.search, $options: 'i' } },
       ];
-    }
-
-    if (query.type && query.type !== 'All') {
-      filter.type = query.type;
     }
 
     const items = await this.skillModel.find(filter).sort({ createdAt: -1 });

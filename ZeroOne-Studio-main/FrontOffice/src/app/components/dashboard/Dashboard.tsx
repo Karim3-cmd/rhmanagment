@@ -7,6 +7,7 @@ import { Recommendations } from '../views/Recommendations';
 import { Analytics } from '../views/Analytics';
 import { Profile } from '../views/Profile';
 import { Settings } from '../views/Settings';
+import { Departments } from '../views/Departments';
 import type { User } from '../../lib/types';
 
 interface DashboardProps {
@@ -14,7 +15,7 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-export type ViewType = 'employees' | 'skills' | 'activities' | 'recommendations' | 'analytics' | 'profile' | 'settings';
+export type ViewType = 'employees' | 'skills' | 'activities' | 'recommendations' | 'analytics' | 'profile' | 'settings' | 'departments';
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const [currentView, setCurrentView] = useState<ViewType>('activities');
@@ -29,6 +30,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       case 'analytics': return <Analytics userRole={user.role} />;
       case 'profile': return <Profile user={user} />;
       case 'settings': return <Settings user={user} onLogout={onLogout} />;
+      case 'departments': return <Departments userRole={user.role} user={user} />;
       default: return <Activities userRole={user.role} user={user} />;
     }
   };

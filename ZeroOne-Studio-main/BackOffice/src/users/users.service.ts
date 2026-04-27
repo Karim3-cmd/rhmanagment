@@ -24,4 +24,9 @@ export class UsersService {
     }
     return this.sanitize(user);
   }
+
+  async deleteAll() {
+    const result = await this.userModel.deleteMany({});
+    return { deleted: result.deletedCount };
+  }
 }

@@ -1,6 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsEmail, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  ArrayMinSize,
+  IsArray,
+  IsDateString,
+  IsEmail,
+  Matches,
+  IsNumber,
+  IsOptional,
+  IsString,
+  ValidateNested,
+} from 'class-validator';
 
 export class EducationItemDto {
   @ApiPropertyOptional() @IsOptional() @IsString() degree?: string;
@@ -24,7 +34,10 @@ export class CertificationItemDto {
 export class CreateEmployeeDto {
   @ApiProperty() @IsString() fullName: string;
   @ApiProperty() @IsEmail() email: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
+  @ApiPropertyOptional({ example: '22587469' })
+  @IsOptional()
+  @Matches(/^\d{8}$/, { message: 'phone must contain exactly 8 digits' })
+  phone?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() department?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() position?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() location?: string;
@@ -35,11 +48,30 @@ export class CreateEmployeeDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() skillsCount?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() activitiesCount?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() bio?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() joinedAt?: string;
+  @ApiPropertyOptional({ example: '2026-04-21' })
+  @IsOptional()
+  @IsDateString()
+  joinedAt?: string;
+  @ApiProperty({ type: [String], minItems: 1 })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  specializedSkills: string[];
   @ApiPropertyOptional({ type: [EducationItemDto] })
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => EducationItemDto)
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => EducationItemDto)
   education?: EducationItemDto[];
   @ApiPropertyOptional({ type: [CertificationItemDto] })
-  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CertificationItemDto)
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CertificationItemDto)
   certifications?: CertificationItemDto[];
+
+  @ApiPropertyOptional({ example: 'Employee', enum: ['HR', 'Manager', 'Employee'] })
+  @IsOptional()
+  @IsString()
+  role?: string;
 }

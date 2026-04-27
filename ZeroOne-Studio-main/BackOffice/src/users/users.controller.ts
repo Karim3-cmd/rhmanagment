@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Delete, Get, Param } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 
@@ -17,5 +17,11 @@ export class UsersController {
   @ApiOperation({ summary: 'Get user by id' })
   findById(@Param('id') id: string) {
     return this.usersService.findById(id);
+  }
+
+  @Delete('all')
+  @ApiOperation({ summary: 'Delete all users' })
+  deleteAll() {
+    return this.usersService.deleteAll();
   }
 }

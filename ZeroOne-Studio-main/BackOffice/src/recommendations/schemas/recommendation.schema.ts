@@ -17,6 +17,18 @@ export class Recommendation {
   @Prop({ required: true })
   activityTitle: string;
 
+  @Prop({ default: 0, min: 0 })
+  activitySeats: number;
+
+  @Prop({ default: 0, min: 0 })
+  occupiedSeats: number;
+
+  @Prop({ default: 0, min: 0 })
+  availableSeats: number;
+
+  @Prop({ default: 0, min: 0 })
+  eligibleEmployeesCount: number;
+
   @Prop({ default: 0, min: 0, max: 100 })
   score: number;
 
