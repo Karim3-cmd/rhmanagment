@@ -306,3 +306,22 @@ export const settingsApi = {
     return data;
   },
 };
+
+export const aiApi = {
+  async recommendEmployees(description: string, department?: string) {
+    const { data } = await api.post<{
+      success: boolean;
+      extractedSkills: string[];
+      recommendations: Array<{
+        employeeId: string;
+        employeeName: string;
+        department: string;
+        score: number;
+        matchedSkills: Array<{ skill: string; rating: number }>;
+        missingSkills: string[];
+        isFromOtherDepartment: boolean;
+      }>;
+    }>('/ai/recommend-employees', { description, department });
+    return data;
+  },
+};

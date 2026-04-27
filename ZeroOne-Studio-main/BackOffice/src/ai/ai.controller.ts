@@ -1,9 +1,14 @@
 import { Controller, Post, Body, Req, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { IsString, IsOptional } from 'class-validator';
 import { GeminiService } from './gemini.service';
 
 class AIRecommendationRequest {
+  @IsString()
   description: string;
+
+  @IsString()
+  @IsOptional()
   department?: string;
 }
 
@@ -34,16 +39,19 @@ export class AIController {
   constructor(private readonly geminiService: GeminiService) {}
 
   @Post('recommend-employees')
-  @ApiBearerAuth()
   @ApiOperation({ summary: 'Get AI-recommended employees based on description' })
   @ApiResponse({ status: 200, description: 'Recommendations generated successfully', type: AIRecommendationResponse })
   async recommendEmployees(@Body() req: AIRecommendationRequest, @Req() request: any): Promise<AIRecommendationResponse> {
-    const user = request.user;
-    if (!user || !user.department) {
-      return { success: false, extractedSkills: [], recommendations: [] };
+    // Get department from body first, then from authenticated user, then empty (global search)
+    let department = req.department;
+    if (!department && request.user) {
+      department = request.user.department;
+    }
+    if (!department) {
+      department = ''; // Empty = search all departments
     }
 
-    const recommendations = await this.geminiService.findMatchingEmployees(user.department, req.description);
+    const recommendations = await this.geminiService.findMatchingEmployees(department, req.description);
 
     return {
       success: true,
