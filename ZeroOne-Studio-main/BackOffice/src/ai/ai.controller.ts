@@ -25,6 +25,8 @@ class EmployeeRecommendationDto {
   matchedSkills: MatchedSkillDto[];
   missingSkills: string[];
   isFromOtherDepartment: boolean;
+  yearsOfExperience: number;
+  explanation: string;
 }
 
 class AIRecommendationResponse {
@@ -36,7 +38,7 @@ class AIRecommendationResponse {
 @ApiTags('AI Recommendations')
 @Controller('ai')
 export class AIController {
-  constructor(private readonly geminiService: GeminiService) {}
+  constructor(private readonly geminiService: GeminiService) { }
 
   @Post('recommend-employees')
   @ApiOperation({ summary: 'Get AI-recommended employees based on description' })
@@ -64,6 +66,8 @@ export class AIController {
         matchedSkills: r.matchedSkills,
         missingSkills: r.missingSkills,
         isFromOtherDepartment: r.isFromOtherDepartment,
+        yearsOfExperience: r.yearsOfExperience,
+        explanation: r.explanation,
       })),
     };
   }

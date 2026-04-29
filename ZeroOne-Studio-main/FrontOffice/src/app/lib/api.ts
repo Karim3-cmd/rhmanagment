@@ -383,6 +383,8 @@ export const aiApi = {
         matchedSkills: Array<{ skill: string; rating: number }>;
         missingSkills: string[];
         isFromOtherDepartment: boolean;
+        yearsOfExperience: number;
+        explanation: string;
       }>;
     }>('/ai/recommend-employees', { description, department });
     return data;

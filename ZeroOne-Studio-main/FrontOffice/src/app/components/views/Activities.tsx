@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Calendar, Edit, FileCheck, Plus, Search, Target, Trash2, Upload, Users, X, CheckCircle, Clock, AlertCircle, Sparkles, Star, Loader2 } from 'lucide-react';
 import { activitiesApi, employeesApi, skillsApi, aiApi } from '../../lib/api';
 import type { Activity, Employee, Skill, User, UserRole, ActivityProof } from '../../lib/types';
@@ -37,15 +37,14 @@ export function Activities({ userRole, user }: ActivitiesProps) {
   const [reviewForm, setReviewForm] = useState({ decision: 'approved' as 'approved' | 'rejected', reviewNote: '', progressWeight: 25 });
   const [showAIModal, setShowAIModal] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiResults, setAiResults] = useState<Array<{ employeeId: string; employeeName: string; department: string; score: number; matchedSkills: Array<{ skill: string; rating: number }>; missingSkills: string[]; isFromOtherDepartment: boolean }>>([]);
+  const [aiResults, setAiResults] = useState<Array<{ employeeId: string; employeeName: string; department: string; score: number; matchedSkills: Array<{ skill: string; rating: number }>; missingSkills: string[]; isFromOtherDepartment: boolean; yearsOfExperience?: number; explanation?: string }>>([]);
   const [aiExtractedSkills, setAiExtractedSkills] = useState<string[]>([]);
   // AI recommendations for Add Activity modal
   const [createAiLoading, setCreateAiLoading] = useState(false);
-  const [createAiResults, setCreateAiResults] = useState<Array<{ employeeId: string; employeeName: string; department: string; score: number; matchedSkills: Array<{ skill: string; rating: number }>; missingSkills: string[]; isFromOtherDepartment: boolean }>>([]);
+  const [createAiResults, setCreateAiResults] = useState<Array<{ employeeId: string; employeeName: string; department: string; score: number; matchedSkills: Array<{ skill: string; rating: number }>; missingSkills: string[]; isFromOtherDepartment: boolean; yearsOfExperience?: number; explanation?: string }>>([]);
   const [createAiExtractedSkills, setCreateAiExtractedSkills] = useState<string[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-  const [showAiModal, setShowAiModal] = useState(false);
-  const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
+  const aiDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const proofTypes = ['Certificate', 'Course', 'Project', 'Evaluation', 'Document', 'Other'];
 
   const loadData = async () => {
@@ -104,24 +103,23 @@ export function Activities({ userRole, user }: ActivitiesProps) {
         setShowModal(false);
         await loadData();
       } else {
-        await activitiesApi.create(form);
-        setShowModal(false);
-        await loadData();
-        // Trigger AI Recommendations
-        if (form.description) {
-          setAiLoading(true);
-          setShowAiModal(true);
+        const created = await activitiesApi.create(form);
+        // Assign selected employees
+        for (const employeeId of selectedEmployees) {
           try {
-            const aiData = await aiApi.recommendEmployees(form.description);
-            if (aiData.success && aiData.recommendations) {
-              setAiRecommendations(aiData.recommendations);
-            }
-          } catch (e) {
-            console.error('AI Error:', e);
-          } finally {
-            setAiLoading(false);
+            await activitiesApi.assign(created._id, {
+              employeeId,
+              notes: `AI-recommended based on skill match`,
+            });
+          } catch (assignErr) {
+            console.error(`Failed to assign ${employeeId}:`, assignErr);
           }
         }
+        setShowModal(false);
+        setSelectedEmployees([]);
+        setCreateAiResults([]);
+        setCreateAiExtractedSkills([]);
+        await loadData();
       }
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Could not save activity');
@@ -460,7 +458,8 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                     setForm({ ...form, description: newDesc });
                     // Auto-fetch AI recommendations when description changes (debounced)
                     if (!editingActivity && newDesc.length > 10) {
-                      setTimeout(() => fetchCreateAiRecommendations(newDesc), 500);
+                      if (aiDebounceRef.current) clearTimeout(aiDebounceRef.current);
+                      aiDebounceRef.current = setTimeout(() => fetchCreateAiRecommendations(newDesc), 500);
                     }
                   }}
                   className="w-full px-4 py-2 border border-input rounded-lg min-h-32"
@@ -520,7 +519,7 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                             </div>
                             <div>
                               <h4 className="font-medium text-gray-900">{result.employeeName}</h4>
-                              <p className="text-xs text-gray-500">{result.department}</p>
+                              <p className="text-xs text-gray-500">{result.department}{result.yearsOfExperience !== undefined ? ` · ${result.yearsOfExperience} years exp.` : ''}</p>
                             </div>
                           </div>
                           <div className="text-right">
@@ -540,6 +539,11 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                             {result.matchedSkills.map((ms, i) => (
                               <span key={i} className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">{ms.skill} ★{ms.rating}</span>
                             ))}
+                          </div>
+                        )}
+                        {result.explanation && (
+                          <div className="mt-3 text-xs italic text-gray-700 bg-purple-50 p-2 rounded border-l-2 border-purple-400">
+                            <strong>AI Reasoning:</strong> {result.explanation}
                           </div>
                         )}
                       </div>
@@ -768,6 +772,7 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                             <div className="flex items-start justify-between mb-3">
                               <div>
                                 <h4 className="font-semibold text-gray-900">{result.employeeName}</h4>
+                                <p className="text-xs text-gray-500">{result.department}{result.yearsOfExperience !== undefined ? ` · ${result.yearsOfExperience} years exp.` : ''}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                   <div className="flex items-center gap-1">
                                     {[1, 2, 3, 4, 5].map((star) => (
@@ -817,6 +822,12 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                                 </div>
                               </div>
                             )}
+
+                            {result.explanation && (
+                              <div className="mt-3 text-sm italic text-gray-700 bg-purple-50 p-3 rounded-lg border-l-4 border-purple-400">
+                                <strong>AI Reasoning:</strong> {result.explanation}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -833,88 +844,6 @@ export function Activities({ userRole, user }: ActivitiesProps) {
         </div>
       )}
 
-      {/* AI Recommendations Modal */}
-      {showAiModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 max-h-[90vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4 border-b pb-4">
-              <div>
-                <h2 className="text-2xl font-bold flex items-center gap-2">
-                  <span className="bg-primary/10 text-primary p-2 rounded-lg">✨</span>
-                  Gemini AI Recommendations
-                </h2>
-                <p className="text-sm text-gray-500 mt-1">Suggested employees for the activity you just created based on required skills.</p>
-              </div>
-              <button onClick={() => setShowAiModal(false)} className="p-2 hover:bg-secondary rounded-lg"><X className="w-5 h-5" /></button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto pr-2">
-              {aiLoading ? (
-                <div className="flex flex-col items-center justify-center py-12 space-y-4">
-                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                  <p className="text-gray-500">Gemini is analyzing the description and matching skills...</p>
-                </div>
-              ) : aiRecommendations.length === 0 ? (
-                <div className="text-center py-12 text-gray-500">
-                  No suitable employees could be identified within your department based on the description provided.
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {aiRecommendations.map((rec, index) => (
-                    <div key={rec.employeeId} className="bg-gray-50 rounded-lg p-4 border border-gray-100 shadow-sm flex flex-col gap-3">
-                      <div className="flex justify-between items-start">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${index === 0 ? 'bg-yellow-400' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-amber-600' : 'bg-blue-500'}`}>
-                            #{index + 1}
-                          </div>
-                          <div>
-                            <h3 className="font-semibold text-lg">{rec.employeeName}</h3>
-                            <p className="text-xs text-gray-500">{rec.department}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">
-                          Score: {rec.score}/100
-                        </div>
-                      </div>
-
-                      <div className="text-sm">
-                        <div className="font-medium text-gray-700 mb-1">Matched Skills:</div>
-                        <div className="flex gap-2 flex-wrap mb-2">
-                          {rec.matchedSkills.length > 0 ? rec.matchedSkills.map((ms: any, i: number) => (
-                            <span key={i} className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs flex items-center gap-1">
-                              {ms.skill}
-                              <span className="text-blue-500/80">★{ms.rating}</span>
-                            </span>
-                          )) : <span className="text-gray-400 italic">None specifically matched</span>}
-                        </div>
-
-                        {rec.missingSkills && rec.missingSkills.length > 0 && (
-                          <>
-                            <div className="font-medium text-gray-700 mb-1 text-xs mt-2">Missing Requested Skills:</div>
-                            <div className="flex gap-2 flex-wrap">
-                              {rec.missingSkills.map((ms: string, i: number) => (
-                                <span key={i} className="bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded text-[10px]">
-                                  {ms}
-                                </span>
-                              ))}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
-              <button onClick={() => setShowAiModal(false)} className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors">
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

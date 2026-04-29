@@ -1,5 +1,6 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, ForbiddenException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, ForbiddenException, UseGuards } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
 import { ActivitiesService } from './activities.service';
 import { AssignActivityDto } from './dto/assign-activity.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
@@ -8,6 +9,8 @@ import { QueryActivitiesDto } from './dto/query-activities.dto';
 import { ReviewActivityEnrollmentDto } from './dto/review-activity-enrollment.dto';
 import { UpdateActivityDto } from './dto/update-activity.dto';
 import { UpdateActivityProgressDto } from './dto/update-activity-progress.dto';
+import { CurrentUser } from '../auth/current-user.decorator';
+import type { CurrentUserData } from '../auth/current-user.decorator';
 
 @ApiTags('activities')
 @Controller('activities')
@@ -74,34 +77,34 @@ export class ActivitiesController {
     return this.activitiesService.getPendingApprovals(managerId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post(':id/approve/:employeeId')
   @ApiOperation({ summary: 'Manager approves an enrollment' })
   async approve(
     @Param('id') id: string,
     @Param('employeeId') employeeId: string,
     @Body() dto: { reviewedBy: string; reviewNote?: string; progressWeight?: number },
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
   ) {
-    const user = req.user;
     if (user.role !== 'Manager' && user.role !== 'HR') {
       throw new ForbiddenException('Only managers can approve enrollments');
     }
-    return this.activitiesService.approveEnrollment(id, employeeId, dto.reviewedBy, dto.reviewNote, dto.progressWeight, user._id.toString());
+    return this.activitiesService.approveEnrollment(id, employeeId, dto.reviewedBy, dto.reviewNote, dto.progressWeight, user.userId);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Post(':id/reject/:employeeId')
   @ApiOperation({ summary: 'Manager rejects an enrollment' })
   async reject(
     @Param('id') id: string,
     @Param('employeeId') employeeId: string,
     @Body() dto: { reviewedBy: string; reviewNote?: string },
-    @Req() req: any,
+    @CurrentUser() user: CurrentUserData,
   ) {
-    const user = req.user;
     if (user.role !== 'Manager' && user.role !== 'HR') {
       throw new ForbiddenException('Only managers can reject enrollments');
     }
-    return this.activitiesService.rejectEnrollment(id, employeeId, dto.reviewedBy, dto.reviewNote, user._id.toString());
+    return this.activitiesService.rejectEnrollment(id, employeeId, dto.reviewedBy, dto.reviewNote, user.userId);
   }
 
   @Patch(':id/progress/:employeeId')

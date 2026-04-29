@@ -13,13 +13,15 @@ interface EmployeeMatch {
   matchedSkills: { skill: string; rating: number }[];
   missingSkills: string[];
   isFromOtherDepartment: boolean;
+  yearsOfExperience: number;
+  explanation: string;
 }
 
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
   private readonly apiKey: string;
-  private readonly apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+  private readonly apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
   constructor(
     @InjectModel(Employee.name)
@@ -259,8 +261,16 @@ Skills (comma-separated only):`;
       maxPossibleScore += 5;
     }
 
-    const score = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
-    this.logger.log(`[CALC] ${employeeName} score: ${score}% (${matchedSkills.length}/${requiredSkills.length} skills)`);
+    let baseScore = maxPossibleScore > 0 ? Math.round((totalScore / maxPossibleScore) * 100) : 0;
+
+    // Experience bonus: up to +20 points (2 per year, capped)
+    const expBonus = Math.min((employee.yearsOfExperience || 0) * 2, 20);
+
+    // Department bonus: +15 if from the manager's department
+    const deptBonus = !isFromOtherDept ? 15 : 0;
+
+    const score = Math.min(100, baseScore + expBonus + deptBonus);
+    this.logger.log(`[CALC] ${employeeName} base=${baseScore}% + exp=${expBonus} + dept=${deptBonus} => final=${score}% (${matchedSkills.length}/${requiredSkills.length} skills)`);
 
     if (score === 0) return null;
 
@@ -272,6 +282,8 @@ Skills (comma-separated only):`;
       matchedSkills,
       missingSkills,
       isFromOtherDepartment: isFromOtherDept,
+      yearsOfExperience: employee.yearsOfExperience || 0,
+      explanation: `Base match ${baseScore}% + ${expBonus}pt experience + ${deptBonus}pt department alignment`,
     };
   }
 
@@ -330,7 +342,70 @@ Skills (comma-separated only):`;
       this.logger.log(`[MATCH] Found ${matches.length} matching employees across all departments`);
     }
 
-    const sortedMatches = matches.sort((a, b) => b.score - a.score);
+    let sortedMatches = matches.sort((a, b) => b.score - a.score);
+
+    // Top 15 matches sent to Gemini for advanced ranking considering experience and department
+    const topCandidates = sortedMatches.slice(0, 15);
+
+    if (topCandidates.length > 0) {
+      this.logger.log(`[MATCH] Requesting advanced AI rankings for top ${topCandidates.length} candidates...`);
+
+      const candidateData = topCandidates.map((c) => ({
+        id: c.employeeId,
+        name: c.employeeName,
+        department: c.department,
+        yearsOfExperience: c.yearsOfExperience,
+        matchedSkills: c.matchedSkills.map(s => s.skill).join(', '),
+        missingSkills: c.missingSkills.join(', '),
+      }));
+
+      const prompt = `You are an expert HR recruiter. Analyze these candidates against the job description and rank them from best to worst match.
+
+Job Description: "${description}"
+Target Department (give strong preference): "${managerDepartment || 'Any'}"
+
+SCORING RULES — you MUST follow these strictly:
+- Start from the skill match ratio, then adjust UP or DOWN based on the rules below.
+- Years of Experience: add 2 points per year, max +20. A candidate with 10+ years should get a noticeably higher score than one with 1 year if skills are similar.
+- Same Department: add +15 points if department equals "${managerDepartment || 'Any'}".
+- Missing Skills: subtract 5-15 points per missing critical skill.
+- Score range MUST be 0-100. Scores must NOT all be identical.
+
+Candidates:
+${JSON.stringify(candidateData, null, 2)}
+
+For each candidate, provide:
+1. score: 0-100 (must vary across candidates; do not return the same score for everyone)
+2. explanation: one sentence mentioning their years of experience, department, and key skills.
+
+Return ONLY a JSON array. No markdown, no explanations outside the JSON. Format:
+[
+  {"employeeId": "id", "score": 85, "explanation": "Strong match with 12 years experience in IT and React."}
+]`;
+
+      try {
+        const aiResponse = await this.callGemini(prompt);
+        let rankings: any[] = [];
+        const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          rankings = JSON.parse(jsonMatch[0]);
+
+          // Apply new rankings
+          for (const match of topCandidates) {
+            const ranking = rankings.find(r => r.employeeId === match.employeeId);
+            if (ranking) {
+              match.score = ranking.score;
+              match.explanation = ranking.explanation;
+            }
+          }
+          sortedMatches = topCandidates.sort((a, b) => b.score - a.score);
+          this.logger.log(`[MATCH] Advanced ranking successful.`);
+        }
+      } catch (error) {
+        this.logger.error(`[MATCH] Advanced AI ranking failed, falling back to basic scoring: ${error}`);
+      }
+    }
+
     this.logger.log(`[MATCH] Returning ${sortedMatches.length} sorted recommendations`);
     return sortedMatches;
   }

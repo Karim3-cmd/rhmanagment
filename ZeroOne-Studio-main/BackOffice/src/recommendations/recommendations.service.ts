@@ -127,11 +127,11 @@ export class RecommendationsService {
         }
 
         const completionBonus = (employee.activitiesCount || 0) > 0 ? Math.min((employee.activitiesCount || 0) * 3, 15) : 0;
-        const experienceBonus = (employee.yearsOfExperience || 0) > 0 ? Math.min((employee.yearsOfExperience || 0) * 2, 10) : 0;
+        const experienceBonus = (employee.yearsOfExperience || 0) > 0 ? Math.min((employee.yearsOfExperience || 0) * 5, 20) : 0;
         const certificationBonus = Math.min((employee.certifications || []).length * 3, 12);
         const departmentBonus = activity.targetDepartment && employee.department === activity.targetDepartment ? 10 : 0;
         const score = target === 0
-          ? 50 + departmentBonus + certificationBonus
+          ? 50 + departmentBonus + certificationBonus + experienceBonus
           : Math.max(0, Math.min(100, Math.round((earned / target) * 65 + completionBonus + experienceBonus + certificationBonus + departmentBonus)));
 
         const occupiedSeats = (activity.enrollments || []).length;
