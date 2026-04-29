@@ -220,6 +220,10 @@ export class RecommendationsService {
     if (query.status && query.status !== 'All') filter.status = query.status;
     if (query.employeeId) filter.employeeId = query.employeeId;
     if (query.activityId) filter.activityId = query.activityId;
+    if ((query as any).managerDepartment) {
+      const employeesInDept = await this.employeeModel.find({ department: (query as any).managerDepartment }).select('_id');
+      filter.employeeId = { $in: employeesInDept.map(e => e._id) };
+    }
     const items = await this.recommendationModel.find(filter).sort({ score: -1, createdAt: -1 });
     return { total: items.length, items };
   }

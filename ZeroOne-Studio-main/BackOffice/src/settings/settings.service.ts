@@ -6,14 +6,14 @@ import { UserSettings, UserSettingsDocument } from './schemas/user-settings.sche
 
 @Injectable()
 export class SettingsService {
-  constructor(@InjectModel(UserSettings.name) private readonly settingsModel: Model<UserSettingsDocument>) {}
+  constructor(@InjectModel(UserSettings.name) private readonly settingsModel: Model<UserSettingsDocument>) { }
 
   async getByUserId(userId: string) {
-    let settings = await this.settingsModel.findOne({ userId });
-    if (!settings) {
-      settings = await this.settingsModel.create({ userId: new Types.ObjectId(userId) });
-    }
-    return settings;
+    return this.settingsModel.findOneAndUpdate(
+      { userId },
+      { $setOnInsert: { userId: new Types.ObjectId(userId) } },
+      { upsert: true, new: true }
+    );
   }
 
   async updateByUserId(userId: string, dto: UpdateSettingsDto) {

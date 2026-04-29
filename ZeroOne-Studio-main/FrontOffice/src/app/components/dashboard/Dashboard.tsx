@@ -9,6 +9,7 @@ import { Profile } from '../views/Profile';
 import { Settings } from '../views/Settings';
 import { Departments } from '../views/Departments';
 import { JobMatching } from '../views/JobMatching';
+import { ManagerApprovals } from '../views/ManagerApprovals';
 import type { User } from '../../lib/types';
 
 interface DashboardProps {
@@ -16,7 +17,7 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-export type ViewType = 'employees' | 'skills' | 'activities' | 'recommendations' | 'analytics' | 'profile' | 'settings' | 'departments' | 'job-matching';
+export type ViewType = 'employees' | 'skills' | 'activities' | 'recommendations' | 'analytics' | 'profile' | 'settings' | 'departments' | 'job-matching' | 'approvals';
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const [currentView, setCurrentView] = useState<ViewType>('activities');
@@ -33,6 +34,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       case 'settings': return <Settings user={user} />;
       case 'departments': return <Departments userRole={user.role} user={user} />;
       case 'job-matching': return <JobMatching />;
+      case 'approvals': return <ManagerApprovals user={user} />;
       default: return <Activities userRole={user.role} user={user} />;
     }
   };

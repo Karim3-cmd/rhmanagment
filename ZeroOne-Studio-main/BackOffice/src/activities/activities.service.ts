@@ -183,6 +183,11 @@ export class ActivitiesService {
     return this.mapActivity(activity);
   }
 
+  async assign(activityId: string, dto: { employeeId: string; notes?: string }) {
+    // HR assigns employee - requires manager approval
+    return this.enroll(activityId, dto, true);
+  }
+
   private async notifyManagerOfPendingApproval(activity: ActivityDocument, employee: EmployeeDocument) {
     // Find the manager of the employee's department
     const manager = await this.userModel.findOne({
@@ -203,7 +208,7 @@ export class ActivitiesService {
     }
   }
 
-  async approveEnrollment(activityId: string, employeeId: string, reviewedBy: string, reviewNote?: string, progressWeight: number = 25) {
+  async approveEnrollment(activityId: string, employeeId: string, reviewedBy: string, reviewNote?: string, progressWeight: number = 25, managerUserId?: string) {
     const activity = await this.activityModel.findById(activityId);
     if (!activity) throw new NotFoundException('Activity not found');
 
@@ -212,6 +217,18 @@ export class ActivitiesService {
 
     if (enrollment.status !== 'Pending Manager Approval') {
       throw new BadRequestException('Enrollment is not pending manager approval');
+    }
+
+    // Verify manager can approve for this employee's department
+    if (managerUserId) {
+      const employee = await this.employeeModel.findById(employeeId);
+      const manager = await this.userModel.findById(managerUserId);
+      if (!manager || manager.role !== 'Manager') {
+        throw new BadRequestException('Only managers can approve enrollments');
+      }
+      if (manager.department !== employee?.department) {
+        throw new BadRequestException('You can only approve enrollments for employees in your department');
+      }
     }
 
     enrollment.status = 'Approved';
@@ -236,7 +253,7 @@ export class ActivitiesService {
     return this.mapActivity(activity);
   }
 
-  async rejectEnrollment(activityId: string, employeeId: string, reviewedBy: string, reviewNote?: string) {
+  async rejectEnrollment(activityId: string, employeeId: string, reviewedBy: string, reviewNote?: string, managerUserId?: string) {
     const activity = await this.activityModel.findById(activityId);
     if (!activity) throw new NotFoundException('Activity not found');
 
@@ -245,6 +262,18 @@ export class ActivitiesService {
 
     if (enrollment.status !== 'Pending Manager Approval') {
       throw new BadRequestException('Enrollment is not pending manager approval');
+    }
+
+    // Verify manager can reject for this employee's department
+    if (managerUserId) {
+      const employee = await this.employeeModel.findById(employeeId);
+      const manager = await this.userModel.findById(managerUserId);
+      if (!manager || manager.role !== 'Manager') {
+        throw new BadRequestException('Only managers can reject enrollments');
+      }
+      if (manager.department !== employee?.department) {
+        throw new BadRequestException('You can only reject enrollments for employees in your department');
+      }
     }
 
     enrollment.status = 'Rejected';
@@ -266,6 +295,57 @@ export class ActivitiesService {
     });
 
     return this.mapActivity(activity);
+  }
+
+  async getPendingApprovals(managerUserId: string) {
+    const manager = await this.userModel.findById(managerUserId);
+    console.log('[DEBUG] Manager:', manager?.email, 'Role:', manager?.role, 'Department:', manager?.department);
+
+    if (!manager) {
+      throw new BadRequestException(`User not found for ID: ${managerUserId}`);
+    }
+    if (manager.role !== 'Manager' && manager.role !== 'HR') {
+      throw new BadRequestException(`Role error: User role is ${manager.role}. Only managers/HR can view.`);
+    }
+
+    // Get all activities with enrollments pending manager approval
+    const activities = await this.activityModel.find().lean();
+    const pendingApprovals: Array<{
+      activityId: string;
+      activityTitle: string;
+      employeeId: string;
+      employeeName: string;
+      employeeDepartment: string;
+      enrolledAt: string;
+      notes: string;
+    }> = [];
+
+    for (const activity of activities) {
+      for (const enrollment of activity.enrollments || []) {
+        console.log('[DEBUG] Enrollment status:', enrollment.status, '| Employee:', enrollment.employeeName, '| Activity:', activity.title);
+        console.log('[DEBUG] Status check:', enrollment.status === 'Pending Manager Approval', 'Type:', typeof enrollment.status);
+        if (enrollment.status === 'Pending Manager Approval') {
+          // Get employee department to verify it matches manager's department
+          const employee = await this.employeeModel.findById(enrollment.employeeId.toString()).lean();
+          console.log('[DEBUG] Employee dept:', employee?.department, '| Manager dept:', manager?.department);
+          console.log('[DEBUG] Dept match:', employee?.department === manager?.department, '| Case sensitive check');
+          if (employee && employee.department && manager?.department && employee.department === manager.department) {
+            pendingApprovals.push({
+              activityId: activity._id.toString(),
+              activityTitle: activity.title,
+              employeeId: enrollment.employeeId.toString(),
+              employeeName: enrollment.employeeName,
+              employeeDepartment: employee.department || '',
+              enrolledAt: enrollment.enrolledAt,
+              notes: enrollment.notes,
+            });
+          }
+        }
+      }
+    }
+
+    console.log('[DEBUG] Found approvals:', pendingApprovals.length);
+    return { total: pendingApprovals.length, items: pendingApprovals };
   }
 
   async reviewEnrollment(activityId: string, employeeId: string, dto: ReviewActivityEnrollmentDto) {

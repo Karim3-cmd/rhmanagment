@@ -22,14 +22,15 @@ export function Recommendations({ userRole, user }: RecommendationsProps) {
   }, []);
 
   const loadRecommendations = async () => {
-    const employeeId = user.role === 'Employee' ? undefined : undefined;
+    const employeeId = user.role === 'Employee' ? user._id : undefined; // actually, the frontend might not have employeeId matching user._id directly unless backend synced them or they use it. but for now just pass managerDepartment.
     const result = await recommendationsApi.list({
       search: searchTerm || undefined,
       status: statusFilter,
       employeeId,
       skill: skillFilter !== 'All' ? skillFilter : undefined,
-      matchLevel: matchLevelFilter !== 'All' ? matchLevelFilter : undefined
-    });
+      matchLevel: matchLevelFilter !== 'All' ? matchLevelFilter : undefined,
+      ...(user.role === 'Manager' && user.department ? { managerDepartment: user.department } : {})
+    } as any);
     setRecommendations(result.items);
   };
 

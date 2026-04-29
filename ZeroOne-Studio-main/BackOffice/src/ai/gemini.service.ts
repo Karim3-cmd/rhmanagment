@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { ConfigService } from '@nestjs/config';
 import { Employee, EmployeeDocument } from '../employees/schemas/employee.schema';
 import { Skill, SkillDocument } from '../skills/schemas/skill.schema';
 
@@ -17,7 +18,7 @@ interface EmployeeMatch {
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
-  private readonly apiKey = 'AIzaSyC4oE1DtBXXy_tteE-Hz7W4rDnE1CUru1k';
+  private readonly apiKey: string;
   private readonly apiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
 
   constructor(
@@ -25,7 +26,10 @@ export class GeminiService {
     private readonly employeeModel: Model<EmployeeDocument>,
     @InjectModel(Skill.name)
     private readonly skillModel: Model<SkillDocument>,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.apiKey = this.configService.get<string>('GEMINI_API_KEY') || 'AIzaSyC4oE1DtBXXy_tteE-Hz7W4rDnE1CUru1k';
+  }
 
   /**
    * Generate common variations of skill names for flexible matching

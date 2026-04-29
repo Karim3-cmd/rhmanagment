@@ -44,6 +44,8 @@ export function Activities({ userRole, user }: ActivitiesProps) {
   const [createAiResults, setCreateAiResults] = useState<Array<{ employeeId: string; employeeName: string; department: string; score: number; matchedSkills: Array<{ skill: string; rating: number }>; missingSkills: string[]; isFromOtherDepartment: boolean }>>([]);
   const [createAiExtractedSkills, setCreateAiExtractedSkills] = useState<string[]>([]);
   const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<any[]>([]);
   const proofTypes = ['Certificate', 'Course', 'Project', 'Evaluation', 'Document', 'Other'];
 
   const loadData = async () => {
@@ -99,11 +101,28 @@ export function Activities({ userRole, user }: ActivitiesProps) {
     try {
       if (editingActivity) {
         await activitiesApi.update(editingActivity._id, form);
+        setShowModal(false);
+        await loadData();
       } else {
         await activitiesApi.create(form);
+        setShowModal(false);
+        await loadData();
+        // Trigger AI Recommendations
+        if (form.description) {
+          setAiLoading(true);
+          setShowAiModal(true);
+          try {
+            const aiData = await aiApi.recommendEmployees(form.description);
+            if (aiData.success && aiData.recommendations) {
+              setAiRecommendations(aiData.recommendations);
+            }
+          } catch (e) {
+            console.error('AI Error:', e);
+          } finally {
+            setAiLoading(false);
+          }
+        }
       }
-      setShowModal(false);
-      await loadData();
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Could not save activity');
     }
@@ -118,10 +137,17 @@ export function Activities({ userRole, user }: ActivitiesProps) {
   const enroll = async () => {
     if (!showEnrollModal || !selectedEmployeeId) return;
     try {
-      await activitiesApi.enroll(showEnrollModal, {
-        employeeId: selectedEmployeeId,
-        notes: enrollNotes,
-      });
+      if (userRole === 'HR') {
+        await activitiesApi.assign(showEnrollModal, {
+          employeeId: selectedEmployeeId,
+          notes: enrollNotes,
+        });
+      } else {
+        await activitiesApi.enroll(showEnrollModal, {
+          employeeId: selectedEmployeeId,
+          notes: enrollNotes,
+        });
+      }
       setShowEnrollModal(null);
       setSelectedEmployeeId('');
       setEnrollNotes('');
@@ -231,10 +257,17 @@ export function Activities({ userRole, user }: ActivitiesProps) {
 
   const assignFromAI = async (activityId: string, employeeId: string) => {
     try {
-      await activitiesApi.enroll(activityId, {
-        employeeId,
-        notes: `AI-recommended based on skill match`,
-      });
+      if (userRole === 'HR') {
+        await activitiesApi.assign(activityId, {
+          employeeId,
+          notes: `AI-recommended based on skill match`,
+        });
+      } else {
+        await activitiesApi.enroll(activityId, {
+          employeeId,
+          notes: `AI-recommended based on skill match`,
+        });
+      }
       closeAIModal();
       await loadData();
     } catch (err: any) {
@@ -334,7 +367,7 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Progress Bar */}
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-sm">
@@ -342,8 +375,8 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                       <span className="font-medium">{enrollment.progress || 0}%</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-primary h-2 rounded-full transition-all" 
+                      <div
+                        className="bg-primary h-2 rounded-full transition-all"
                         style={{ width: `${enrollment.progress || 0}%` }}
                       />
                     </div>
@@ -368,7 +401,7 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                                 {proof.status}
                               </span>
                               {(userRole === 'HR' || userRole === 'Manager') && proof.status === 'pending' && (
-                                <button 
+                                <button
                                   onClick={() => setShowReviewModal({ activity, enrollment, proofIndex: idx })}
                                   className="text-primary hover:underline text-xs"
                                 >
@@ -384,7 +417,7 @@ export function Activities({ userRole, user }: ActivitiesProps) {
 
                   {/* Submit Proof Button - Only for Employee */}
                   {userRole === 'Employee' && getMyEmployeeId() === enrollment.employeeId && (enrollment.progress || 0) < 100 && (
-                    <button 
+                    <button
                       onClick={() => setShowProofModal({ activityId: activity._id, employeeId: enrollment.employeeId })}
                       className="flex items-center gap-2 text-primary hover:underline text-sm"
                     >
@@ -472,19 +505,17 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                       <div
                         key={result.employeeId}
                         onClick={() => toggleEmployeeSelection(result.employeeId)}
-                        className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                          selectedEmployees.includes(result.employeeId)
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border hover:border-primary/50'
-                        }`}
+                        className={`border rounded-lg p-3 cursor-pointer transition-colors ${selectedEmployees.includes(result.employeeId)
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border hover:border-primary/50'
+                          }`}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                              selectedEmployees.includes(result.employeeId)
-                                ? 'border-primary bg-primary'
-                                : 'border-gray-300'
-                            }`}>
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedEmployees.includes(result.employeeId)
+                              ? 'border-primary bg-primary'
+                              : 'border-gray-300'
+                              }`}>
                               {selectedEmployees.includes(result.employeeId) && <CheckCircle className="w-3 h-3 text-white" />}
                             </div>
                             <div>
@@ -565,18 +596,18 @@ export function Activities({ userRole, user }: ActivitiesProps) {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm mb-2 text-gray-700">Title</label>
-                <input 
-                  value={proofForm.title} 
-                  onChange={(e) => setProofForm({ ...proofForm, title: e.target.value })} 
-                  className="w-full px-4 py-2 border border-input rounded-lg" 
+                <input
+                  value={proofForm.title}
+                  onChange={(e) => setProofForm({ ...proofForm, title: e.target.value })}
+                  className="w-full px-4 py-2 border border-input rounded-lg"
                   placeholder="e.g., AWS Certification - Module 1"
                 />
               </div>
               <div>
                 <label className="block text-sm mb-2 text-gray-700">Type</label>
-                <select 
-                  value={proofForm.type} 
-                  onChange={(e) => setProofForm({ ...proofForm, type: e.target.value })} 
+                <select
+                  value={proofForm.type}
+                  onChange={(e) => setProofForm({ ...proofForm, type: e.target.value })}
                   className="w-full px-4 py-2 border border-input rounded-lg"
                 >
                   {proofTypes.map((type) => <option key={type} value={type}>{type}</option>)}
@@ -584,19 +615,19 @@ export function Activities({ userRole, user }: ActivitiesProps) {
               </div>
               <div>
                 <label className="block text-sm mb-2 text-gray-700">URL / Link</label>
-                <input 
-                  value={proofForm.url} 
-                  onChange={(e) => setProofForm({ ...proofForm, url: e.target.value })} 
-                  className="w-full px-4 py-2 border border-input rounded-lg" 
+                <input
+                  value={proofForm.url}
+                  onChange={(e) => setProofForm({ ...proofForm, url: e.target.value })}
+                  className="w-full px-4 py-2 border border-input rounded-lg"
                   placeholder="https://..."
                 />
               </div>
               <div>
                 <label className="block text-sm mb-2 text-gray-700">Notes</label>
-                <textarea 
-                  value={proofForm.note} 
-                  onChange={(e) => setProofForm({ ...proofForm, note: e.target.value })} 
-                  className="w-full px-4 py-2 border border-input rounded-lg min-h-24" 
+                <textarea
+                  value={proofForm.note}
+                  onChange={(e) => setProofForm({ ...proofForm, note: e.target.value })}
+                  className="w-full px-4 py-2 border border-input rounded-lg min-h-24"
                   placeholder="Describe what you accomplished..."
                 />
               </div>
@@ -633,14 +664,14 @@ export function Activities({ userRole, user }: ActivitiesProps) {
               <div>
                 <label className="block text-sm mb-2 text-gray-700">Decision</label>
                 <div className="flex gap-4">
-                  <button 
+                  <button
                     onClick={() => setReviewForm({ ...reviewForm, decision: 'approved' })}
                     className={`flex-1 px-4 py-2 rounded-lg border ${reviewForm.decision === 'approved' ? 'bg-green-100 border-green-500 text-green-700' : 'border-input'}`}
                   >
                     <CheckCircle className="w-4 h-4 inline mr-2" />
                     Approve
                   </button>
-                  <button 
+                  <button
                     onClick={() => setReviewForm({ ...reviewForm, decision: 'rejected' })}
                     className={`flex-1 px-4 py-2 rounded-lg border ${reviewForm.decision === 'rejected' ? 'bg-red-100 border-red-500 text-red-700' : 'border-input'}`}
                   >
@@ -652,12 +683,12 @@ export function Activities({ userRole, user }: ActivitiesProps) {
               {reviewForm.decision === 'approved' && (
                 <div>
                   <label className="block text-sm mb-2 text-gray-700">Progress Weight (%)</label>
-                  <input 
-                    type="number" 
-                    min={1} 
-                    max={100} 
-                    value={reviewForm.progressWeight} 
-                    onChange={(e) => setReviewForm({ ...reviewForm, progressWeight: Number(e.target.value) })} 
+                  <input
+                    type="number"
+                    min={1}
+                    max={100}
+                    value={reviewForm.progressWeight}
+                    onChange={(e) => setReviewForm({ ...reviewForm, progressWeight: Number(e.target.value) })}
                     className="w-full px-4 py-2 border border-input rounded-lg"
                   />
                   <p className="text-xs text-gray-500 mt-1">How much this proof contributes to overall progress</p>
@@ -665,10 +696,10 @@ export function Activities({ userRole, user }: ActivitiesProps) {
               )}
               <div>
                 <label className="block text-sm mb-2 text-gray-700">Review Notes</label>
-                <textarea 
-                  value={reviewForm.reviewNote} 
-                  onChange={(e) => setReviewForm({ ...reviewForm, reviewNote: e.target.value })} 
-                  className="w-full px-4 py-2 border border-input rounded-lg min-h-24" 
+                <textarea
+                  value={reviewForm.reviewNote}
+                  onChange={(e) => setReviewForm({ ...reviewForm, reviewNote: e.target.value })}
+                  className="w-full px-4 py-2 border border-input rounded-lg min-h-24"
                   placeholder="Add feedback for the employee..."
                 />
               </div>
@@ -797,6 +828,89 @@ export function Activities({ userRole, user }: ActivitiesProps) {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AI Recommendations Modal */}
+      {showAiModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full p-6 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4 border-b pb-4">
+              <div>
+                <h2 className="text-2xl font-bold flex items-center gap-2">
+                  <span className="bg-primary/10 text-primary p-2 rounded-lg">✨</span>
+                  Gemini AI Recommendations
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">Suggested employees for the activity you just created based on required skills.</p>
+              </div>
+              <button onClick={() => setShowAiModal(false)} className="p-2 hover:bg-secondary rounded-lg"><X className="w-5 h-5" /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-2">
+              {aiLoading ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  <p className="text-gray-500">Gemini is analyzing the description and matching skills...</p>
+                </div>
+              ) : aiRecommendations.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  No suitable employees could be identified within your department based on the description provided.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {aiRecommendations.map((rec, index) => (
+                    <div key={rec.employeeId} className="bg-gray-50 rounded-lg p-4 border border-gray-100 shadow-sm flex flex-col gap-3">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${index === 0 ? 'bg-yellow-400' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-amber-600' : 'bg-blue-500'}`}>
+                            #{index + 1}
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">{rec.employeeName}</h3>
+                            <p className="text-xs text-gray-500">{rec.department}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-bold">
+                          Score: {rec.score}/100
+                        </div>
+                      </div>
+
+                      <div className="text-sm">
+                        <div className="font-medium text-gray-700 mb-1">Matched Skills:</div>
+                        <div className="flex gap-2 flex-wrap mb-2">
+                          {rec.matchedSkills.length > 0 ? rec.matchedSkills.map((ms: any, i: number) => (
+                            <span key={i} className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                              {ms.skill}
+                              <span className="text-blue-500/80">★{ms.rating}</span>
+                            </span>
+                          )) : <span className="text-gray-400 italic">None specifically matched</span>}
+                        </div>
+
+                        {rec.missingSkills && rec.missingSkills.length > 0 && (
+                          <>
+                            <div className="font-medium text-gray-700 mb-1 text-xs mt-2">Missing Requested Skills:</div>
+                            <div className="flex gap-2 flex-wrap">
+                              {rec.missingSkills.map((ms: string, i: number) => (
+                                <span key={i} className="bg-red-50 text-red-600 border border-red-100 px-2 py-0.5 rounded text-[10px]">
+                                  {ms}
+                                </span>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-end">
+              <button onClick={() => setShowAiModal(false)} className="bg-primary text-white px-6 py-2 rounded-lg hover:bg-primary/90 transition-colors">
+                Done
+              </button>
             </div>
           </div>
         </div>

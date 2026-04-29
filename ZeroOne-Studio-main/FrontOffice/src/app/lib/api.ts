@@ -254,6 +254,16 @@ export const activitiesApi = {
     const { data } = await api.delete<Activity>(`/activities/${activityId}/enroll/${employeeId}`, config);
     return data;
   },
+  async assign(activityId: string, payload: { employeeId: string; notes?: string }, customHeaders?: Record<string, string>) {
+    const config = customHeaders ? { headers: customHeaders } : {};
+    const { data } = await api.post<Activity>(`/activities/${activityId}/assign`, payload, config);
+    return data;
+  },
+  async getPendingApprovals(managerId: string, customHeaders?: Record<string, string>) {
+    const config = customHeaders ? { headers: customHeaders } : {};
+    const { data } = await api.get<{ total: number; items: Array<{ activityId: string; activityTitle: string; employeeId: string; employeeName: string; employeeDepartment: string; enrolledAt: string; notes: string }> }>(`/activities/pending-approvals/${managerId}`, config);
+    return data;
+  },
   async approveEnrollment(activityId: string, employeeId: string, reviewedBy: string, reviewNote?: string, progressWeight?: number, customHeaders?: Record<string, string>) {
     const config = customHeaders ? { headers: customHeaders } : {};
     const { data } = await api.post<Activity>(`/activities/${activityId}/approve/${employeeId}`, { reviewedBy, reviewNote, progressWeight }, config);

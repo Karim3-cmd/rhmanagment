@@ -11,6 +11,7 @@ import {
   Building2,
   LogOut,
   Sparkles,
+  ClipboardCheck,
 } from 'lucide-react';
 import { ViewType } from './Dashboard';
 
@@ -72,6 +73,12 @@ export function Sidebar({
       label: 'Recommendations',
       icon: <Target className="w-5 h-5" />,
       roles: ['HR', 'Manager'],
+    },
+    {
+      id: 'approvals',
+      label: 'Approvals',
+      icon: <ClipboardCheck className="w-5 h-5" />,
+      roles: ['Manager'],
     },
     {
       id: 'job-matching',

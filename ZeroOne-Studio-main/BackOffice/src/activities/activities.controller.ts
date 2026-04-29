@@ -1,6 +1,7 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, ForbiddenException } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ActivitiesService } from './activities.service';
+import { AssignActivityDto } from './dto/assign-activity.dto';
 import { CreateActivityDto } from './dto/create-activity.dto';
 import { EnrollActivityDto } from './dto/enroll-activity.dto';
 import { QueryActivitiesDto } from './dto/query-activities.dto';
@@ -11,7 +12,7 @@ import { UpdateActivityProgressDto } from './dto/update-activity-progress.dto';
 @ApiTags('activities')
 @Controller('activities')
 export class ActivitiesController {
-  constructor(private readonly activitiesService: ActivitiesService) {}
+  constructor(private readonly activitiesService: ActivitiesService) { }
 
   @Post()
   @ApiOperation({ summary: 'Create an activity' })
@@ -56,19 +57,51 @@ export class ActivitiesController {
   }
 
   @Post(':id/enroll')
-  @ApiOperation({ summary: 'Enroll an employee into an activity' })
+  @ApiOperation({ summary: 'Enroll an employee into an activity (self-enrollment)' })
   enroll(@Param('id') id: string, @Body() dto: EnrollActivityDto) {
     return this.activitiesService.enroll(id, dto);
   }
 
-  @Patch(':id/review/:employeeId')
-  @ApiOperation({ summary: 'Manager approves or rejects one enrollment' })
-  review(
+  @Post(':id/assign')
+  @ApiOperation({ summary: 'HR assigns an employee to an activity (requires manager approval)' })
+  assign(@Param('id') id: string, @Body() dto: AssignActivityDto) {
+    return this.activitiesService.assign(id, dto);
+  }
+
+  @Get('pending-approvals/:managerId')
+  @ApiOperation({ summary: 'Get pending approvals for a manager' })
+  getPendingApprovals(@Param('managerId') managerId: string) {
+    return this.activitiesService.getPendingApprovals(managerId);
+  }
+
+  @Post(':id/approve/:employeeId')
+  @ApiOperation({ summary: 'Manager approves an enrollment' })
+  async approve(
     @Param('id') id: string,
     @Param('employeeId') employeeId: string,
-    @Body() dto: ReviewActivityEnrollmentDto,
+    @Body() dto: { reviewedBy: string; reviewNote?: string; progressWeight?: number },
+    @Req() req: any,
   ) {
-    return this.activitiesService.reviewEnrollment(id, employeeId, dto);
+    const user = req.user;
+    if (user.role !== 'Manager' && user.role !== 'HR') {
+      throw new ForbiddenException('Only managers can approve enrollments');
+    }
+    return this.activitiesService.approveEnrollment(id, employeeId, dto.reviewedBy, dto.reviewNote, dto.progressWeight, user._id.toString());
+  }
+
+  @Post(':id/reject/:employeeId')
+  @ApiOperation({ summary: 'Manager rejects an enrollment' })
+  async reject(
+    @Param('id') id: string,
+    @Param('employeeId') employeeId: string,
+    @Body() dto: { reviewedBy: string; reviewNote?: string },
+    @Req() req: any,
+  ) {
+    const user = req.user;
+    if (user.role !== 'Manager' && user.role !== 'HR') {
+      throw new ForbiddenException('Only managers can reject enrollments');
+    }
+    return this.activitiesService.rejectEnrollment(id, employeeId, dto.reviewedBy, dto.reviewNote, user._id.toString());
   }
 
   @Patch(':id/progress/:employeeId')

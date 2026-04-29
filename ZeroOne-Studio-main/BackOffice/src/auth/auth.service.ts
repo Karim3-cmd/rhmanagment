@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../users/schemas/user.schema';
+import { Employee, EmployeeDocument } from '../employees/schemas/employee.schema';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
@@ -11,8 +12,9 @@ import { RegisterDto } from './dto/register.dto';
 export class AuthService {
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(Employee.name) private readonly employeeModel: Model<EmployeeDocument>,
     private readonly jwtService: JwtService,
-  ) {}
+  ) { }
 
   private hashPassword(password: string) {
     const salt = randomBytes(16).toString('hex');
@@ -58,6 +60,13 @@ export class AuthService {
     const user = await this.userModel.findOne({ email: dto.email.toLowerCase() });
     if (!user || !this.verifyPassword(dto.password, user.passwordHash)) {
       throw new UnauthorizedException('Invalid email or password');
+    }
+
+    // Identify if the user's role is manager and department is missing, grab from linked Employee
+    const employee = await this.employeeModel.findOne({ email: user.email });
+    if (employee && employee.department && (!user.department || user.department !== employee.department)) {
+      user.department = employee.department;
+      await user.save();
     }
 
     const payload = {
