@@ -17,7 +17,6 @@ export function Skills({ userRole }: SkillsProps) {
   const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
   const [skillForm, setSkillForm] = useState<Partial<Skill>>(emptySkill);
   const [assignEmployeeId, setAssignEmployeeId] = useState('');
-  const [assignLevel, setAssignLevel] = useState(4);
   const [assignNotes, setAssignNotes] = useState('');
   const [error, setError] = useState('');
 
@@ -69,11 +68,10 @@ export function Skills({ userRole }: SkillsProps) {
 
   const submitAssignment = async () => {
     if (!showAssignModal || !assignEmployeeId) return;
-    await skillsApi.assign(showAssignModal, { employeeId: assignEmployeeId, level: assignLevel, notes: assignNotes });
+    await skillsApi.assign(showAssignModal, { employeeId: assignEmployeeId, notes: assignNotes });
     setShowAssignModal(null);
     setAssignEmployeeId('');
     setAssignNotes('');
-    setAssignLevel(4);
     await loadData();
   };
 
@@ -81,24 +79,6 @@ export function Skills({ userRole }: SkillsProps) {
     await skillsApi.unassign(skillId, employeeId);
     await loadData();
   };
-
-  const StarRating = ({ value, onChange, readonly = false }: { value: number; onChange?: (v: number) => void; readonly?: boolean }) => (
-    <div className="flex items-center gap-1">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          key={star}
-          type="button"
-          disabled={readonly}
-          onClick={() => onChange?.(star)}
-          className={`${readonly ? 'cursor-default' : 'cursor-pointer hover:scale-110'} transition-transform`}
-        >
-          <Star
-            className={`w-5 h-5 ${star <= value ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
-          />
-        </button>
-      ))}
-    </div>
-  );
 
   return (
     <div className="p-6 space-y-6">
@@ -166,10 +146,6 @@ export function Skills({ userRole }: SkillsProps) {
                     <div key={assignment.employeeId} className="flex items-center justify-between gap-3 text-sm">
                       <div>
                         <div className="font-medium text-gray-900">{assignment.employeeName}</div>
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <StarRating value={assignment.level} readonly />
-                          <span className="text-xs">({assignment.level}/5)</span>
-                        </div>
                       </div>
                       {userRole === 'HR' && (
                         <button onClick={() => removeAssignment(skill._id, assignment.employeeId)} className="p-1 rounded hover:bg-secondary" title="Remove">
@@ -256,13 +232,6 @@ export function Skills({ userRole }: SkillsProps) {
                 {employeesToAssign.length === 0 && (
                   <p className="text-sm text-muted-foreground mt-1">No employees available.</p>
                 )}
-              </div>
-              <div>
-                <label className="block text-sm mb-2 text-gray-700">Rating (1-5)</label>
-                <div className="flex items-center gap-3">
-                  <StarRating value={assignLevel} onChange={setAssignLevel} />
-                  <span className="text-sm text-muted-foreground">({assignLevel}/5)</span>
-                </div>
               </div>
               <div>
                 <label className="block text-sm mb-2 text-gray-700">Notes</label>

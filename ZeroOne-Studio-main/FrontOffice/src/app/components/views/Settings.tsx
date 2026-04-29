@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Bell, Globe, LogOut, Moon, Save, Shield } from 'lucide-react';
+import { Bell, Globe, Moon, Save, Shield } from 'lucide-react';
 import { settingsApi } from '../../lib/api';
 import type { User, UserSettings } from '../../lib/types';
 
 interface SettingsProps {
   user: User;
-  onLogout: () => void;
 }
 
 const emptySettings: UserSettings = {
@@ -18,7 +17,7 @@ const emptySettings: UserSettings = {
   recommendationNotifications: true,
 };
 
-export function Settings({ user, onLogout }: SettingsProps) {
+export function Settings({ user }: SettingsProps) {
   const [settings, setSettings] = useState<UserSettings>({ ...emptySettings, userId: user._id });
   const [saved, setSaved] = useState('');
 
@@ -62,7 +61,7 @@ export function Settings({ user, onLogout }: SettingsProps) {
         </div>
       </div>
       {saved && <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700">{saved}</div>}
-      <div className="flex flex-col md:flex-row gap-4"><button onClick={save} className="flex items-center justify-center gap-2 flex-1 bg-primary text-white px-6 py-3 rounded-lg"><Save className="w-5 h-5" />Save Changes</button><button onClick={onLogout} className="flex items-center justify-center gap-2 flex-1 md:flex-none bg-destructive text-white px-6 py-3 rounded-lg"><LogOut className="w-5 h-5" />Logout</button></div>
+      <div className="flex flex-col md:flex-row gap-4"><button onClick={save} className="flex items-center justify-center gap-2 flex-1 bg-primary text-white px-6 py-3 rounded-lg"><Save className="w-5 h-5" />Save Changes</button></div>
     </div>
   );
 }

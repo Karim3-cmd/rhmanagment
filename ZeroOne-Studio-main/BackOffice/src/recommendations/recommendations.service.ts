@@ -3,7 +3,9 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Activity, ActivityDocument } from '../activities/schemas/activity.schema';
 import { Employee, EmployeeDocument } from '../employees/schemas/employee.schema';
+import { GeminiService } from '../ai/gemini.service';
 import { Skill, SkillDocument } from '../skills/schemas/skill.schema';
+import { JobDescriptionDto } from './dto/job-description.dto';
 import { QueryRecommendationsDto } from './dto/query-recommendations.dto';
 import { UpdateRecommendationStatusDto } from './dto/update-recommendation-status.dto';
 import { Recommendation, RecommendationDocument } from './schemas/recommendation.schema';
@@ -19,6 +21,7 @@ export class RecommendationsService {
     private readonly activityModel: Model<ActivityDocument>,
     @InjectModel(Skill.name)
     private readonly skillModel: Model<SkillDocument>,
+    private readonly geminiService: GeminiService,
   ) { }
 
   private async syncSpecializedSkillsAssignments() {
@@ -225,5 +228,194 @@ export class RecommendationsService {
     const item = await this.recommendationModel.findByIdAndUpdate(id, { status: dto.status }, { new: true, runValidators: true });
     if (!item) throw new NotFoundException('Recommendation not found');
     return item;
+  }
+
+  /**
+   * Match employees to job description using AI
+   */
+  async matchJobDescription(dto: JobDescriptionDto) {
+    // Step 1: Extract skills from job description using AI
+    const requiredSkills = await this.geminiService.extractSkills(dto.jobDescription);
+
+    // Step 2: Build filter for active employees
+    const filter: Record<string, any> = { status: 'Active' };
+
+    if (dto.department) {
+      filter.department = { $regex: new RegExp(dto.department.trim(), 'i') };
+    }
+    if (dto.minYearsExperience !== undefined) {
+      filter.yearsOfExperience = { $gte: dto.minYearsExperience };
+    }
+
+    // Step 3: Get candidate employees
+    const employees = await this.employeeModel.find(filter).lean();
+    if (employees.length === 0) {
+      return { total: 0, items: [], requiredSkills };
+    }
+
+    // Step 4: Get all skills with employee assignments
+    const skills = await this.skillModel.find().lean();
+    const skillMap = new Map<string, string[]>(); // skillName -> employeeIds
+
+    for (const skill of skills) {
+      const assignedEmployeeIds = (skill.assignments || [])
+        .map((a: any) => a.employeeId.toString());
+      skillMap.set(skill.name.toLowerCase(), assignedEmployeeIds);
+    }
+
+    // Step 5: Calculate preliminary matches
+    const candidateEmployees = employees.map((emp) => {
+      const empId = emp._id.toString();
+      const matchedSkills: string[] = [];
+      const missingSkills: string[] = [];
+
+      for (const skill of requiredSkills) {
+        const skillLower = skill.toLowerCase();
+        const hasSkill = Array.from(skillMap.entries()).some(
+          ([skillName, empIds]) =>
+            skillName.includes(skillLower) || skillLower.includes(skillName),
+        );
+
+        if (hasSkill && skillMap.get(skillLower)?.includes(empId)) {
+          matchedSkills.push(skill);
+        } else {
+          missingSkills.push(skill);
+        }
+      }
+
+      return {
+        employee: emp,
+        matchedSkills,
+        missingSkills,
+        matchRatio: requiredSkills.length > 0 ? matchedSkills.length / requiredSkills.length : 0,
+      };
+    });
+
+    // Step 6: Filter candidates with at least partial match
+    const filteredCandidates = candidateEmployees.filter((c) => c.matchRatio > 0);
+    if (filteredCandidates.length === 0) {
+      return { total: 0, items: [], requiredSkills };
+    }
+
+    // Step 7: Send to AI for ranking with scores and explanations
+    const rankedCandidates = await this.rankCandidatesWithAI(filteredCandidates, dto.jobDescription, requiredSkills);
+
+    return {
+      total: rankedCandidates.length,
+      items: rankedCandidates,
+      requiredSkills,
+    };
+  }
+
+  /**
+   * Rank candidates using AI with scores and explanations
+   */
+  private async rankCandidatesWithAI(
+    candidates: any[],
+    jobDescription: string,
+    requiredSkills: string[],
+  ) {
+    // Prepare candidate data for AI
+    const candidateData = candidates.map((c) => ({
+      id: c.employee._id.toString(),
+      name: c.employee.fullName,
+      department: c.employee.department,
+      position: c.employee.position,
+      yearsOfExperience: c.employee.yearsOfExperience || 0,
+      matchedSkills: c.matchedSkills,
+      missingSkills: c.missingSkills,
+    }));
+
+    const prompt = `You are an expert HR recruiter. Analyze these candidates against the job description and rank them from best to worst match.
+
+Job Description:
+"${jobDescription}"
+
+Required Skills: ${requiredSkills.join(', ')}
+
+Candidates:
+${JSON.stringify(candidateData, null, 2)}
+
+For each candidate, provide:
+1. score: 0-100 (overall match percentage)
+2. explanation: Brief 1-2 sentence explanation of why they match or don't match
+
+Return ONLY a JSON array in this exact format:
+[
+  {
+    "employeeId": "id",
+    "score": 85,
+    "explanation": "Strong match with Node.js and 5 years backend experience"
+  }
+]
+
+Do not include any other text before or after the JSON.`;
+
+    try {
+      const aiResponse = await this.geminiService.callGemini(prompt);
+
+      // Parse AI response
+      let rankings: any[] = [];
+      try {
+        // Try to extract JSON from response
+        const jsonMatch = aiResponse.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          rankings = JSON.parse(jsonMatch[0]);
+        }
+      } catch (parseError) {
+        console.error('Failed to parse AI response:', parseError);
+        // Fallback: use candidate order with basic scoring
+        rankings = candidates.map((c, index) => ({
+          employeeId: c.employee._id.toString(),
+          score: Math.round(c.matchRatio * 100),
+          explanation: `Matches ${c.matchedSkills.length} of ${requiredSkills.length} required skills`,
+        }));
+      }
+
+      // Merge AI rankings with full employee data
+      const result = rankings
+        .map((ranking) => {
+          const candidate = candidates.find(
+            (c) => c.employee._id.toString() === ranking.employeeId,
+          );
+          if (!candidate) return null;
+
+          return {
+            employee: {
+              _id: candidate.employee._id.toString(),
+              fullName: candidate.employee.fullName,
+              email: candidate.employee.email,
+              department: candidate.employee.department,
+              position: candidate.employee.position,
+              yearsOfExperience: candidate.employee.yearsOfExperience || 0,
+            },
+            score: ranking.score,
+            explanation: ranking.explanation,
+            matchedSkills: candidate.matchedSkills,
+            missingSkills: candidate.missingSkills,
+          };
+        })
+        .filter((item): item is NonNullable<typeof item> => item !== null);
+
+      // Sort by score descending
+      return result.sort((a, b) => b.score - a.score);
+    } catch (error) {
+      console.error('AI ranking failed:', error);
+      // Fallback: manual scoring
+      return candidates.map((c) => ({
+        employee: {
+          _id: c.employee._id.toString(),
+          fullName: c.employee.fullName,
+          email: c.employee.email,
+          department: c.employee.department,
+          position: c.employee.position,
+          yearsOfExperience: c.employee.yearsOfExperience || 0,
+        },
+        score: Math.round(c.matchRatio * 100),
+        explanation: `Matches ${c.matchedSkills.length} of ${requiredSkills.length} required skills: ${c.matchedSkills.join(', ')}`,
+        matchedSkills: c.matchedSkills,
+        missingSkills: c.missingSkills,
+      })).sort((a, b) => b.score - a.score);
+    }
   }
 }

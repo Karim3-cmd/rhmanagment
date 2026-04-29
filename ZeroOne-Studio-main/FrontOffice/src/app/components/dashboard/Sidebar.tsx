@@ -9,6 +9,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Building2,
+  LogOut,
+  Sparkles,
 } from 'lucide-react';
 import { ViewType } from './Dashboard';
 
@@ -21,6 +23,7 @@ interface SidebarProps {
   userName: string;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
+  onLogout: () => void;
 }
 
 interface MenuItem {
@@ -37,6 +40,7 @@ export function Sidebar({
   userName,
   isCollapsed,
   onToggleCollapse,
+  onLogout,
 }: SidebarProps) {
   const menuItems: MenuItem[] = [
     {
@@ -67,6 +71,12 @@ export function Sidebar({
       id: 'recommendations',
       label: 'Recommendations',
       icon: <Target className="w-5 h-5" />,
+      roles: ['HR', 'Manager'],
+    },
+    {
+      id: 'job-matching',
+      label: 'Job Matching',
+      icon: <Sparkles className="w-5 h-5" />,
       roles: ['HR', 'Manager'],
     },
     {
@@ -168,6 +178,18 @@ export function Sidebar({
             ))}
           </ul>
         </nav>
+
+        {/* Logout */}
+        <div className="p-4 border-t border-sidebar-border">
+          <button
+            onClick={onLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all hover:bg-sidebar-accent text-sidebar-foreground"
+            title={isCollapsed ? 'Logout' : undefined}
+          >
+            <LogOut className="w-5 h-5" />
+            {!isCollapsed && <span className="flex-1 text-left">Logout</span>}
+          </button>
+        </div>
       </div>
     </aside>
   );

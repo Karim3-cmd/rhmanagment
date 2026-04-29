@@ -5,6 +5,7 @@ import {
   IsArray,
   IsDateString,
   IsEmail,
+  IsIn,
   Matches,
   IsNumber,
   IsOptional,
@@ -32,37 +33,78 @@ export class CertificationItemDto {
 }
 
 export class CreateEmployeeDto {
-  @ApiProperty() @IsString() fullName: string;
-  @ApiProperty() @IsEmail() email: string;
-  @ApiPropertyOptional({ example: '22587469' })
+  @ApiProperty({ description: 'User ID reference' })
+  @IsString()
+  userId: string;
+
+  @ApiProperty({ example: 'John Doe' })
+  @IsString()
+  fullName: string;
+
+  @ApiProperty({ example: 'john@example.com' })
+  @IsEmail()
+  email: string;
+
+  @ApiProperty({ example: 'Engineering' })
+  @IsString()
+  department: string;
+
+  @ApiProperty({ example: 'Senior Developer' })
+  @IsString()
+  position: string;
+
+  @ApiPropertyOptional({ example: 'Tunis' })
   @IsOptional()
-  @Matches(/^\d{8}$/, { message: 'phone must contain exactly 8 digits' })
+  @IsString()
+  location?: string;
+
+  @ApiPropertyOptional({ example: 'Full-time', enum: ['Full-time', 'Part-time', 'Contract', 'Intern', 'Freelance'] })
+  @IsOptional()
+  @IsIn(['Full-time', 'Part-time', 'Contract', 'Intern', 'Freelance'])
+  employmentType?: string;
+
+  @ApiPropertyOptional({ example: 'Active', enum: ['Active', 'Inactive', 'On Leave', 'Suspended', 'Left Company'] })
+  @IsOptional()
+  @IsIn(['Active', 'Inactive', 'On Leave', 'Suspended', 'Left Company'])
+  status?: string;
+
+  @ApiPropertyOptional({ example: '+21698765432' })
+  @IsOptional()
+  @Matches(/^\+216\d{8}$/, { message: 'Phone must start with +216 followed by 8 digits' })
   phone?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() department?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() position?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() location?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() employmentType?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() status?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() managerName?: string;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() yearsOfExperience?: number;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() skillsCount?: number;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() activitiesCount?: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() bio?: string;
-  @ApiPropertyOptional({ example: '2026-04-21' })
+
+  @ApiPropertyOptional({ example: '2024-01-15' })
   @IsOptional()
   @IsDateString()
   joinedAt?: string;
-  @ApiProperty({ type: [String], minItems: 1 })
+
+  @ApiPropertyOptional({ example: 5 })
+  @IsOptional()
+  @IsNumber()
+  yearsOfExperience?: number;
+
+  @ApiPropertyOptional({ example: 'Experienced developer...' })
+  @IsOptional()
+  @IsString()
+  bio?: string;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() managerName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() skillsCount?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() activitiesCount?: number;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @IsString({ each: true })
-  specializedSkills: string[];
+  specializedSkills?: string[];
+
   @ApiPropertyOptional({ type: [EducationItemDto] })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => EducationItemDto)
   education?: EducationItemDto[];
+
   @ApiPropertyOptional({ type: [CertificationItemDto] })
   @IsOptional()
   @IsArray()
@@ -72,6 +114,6 @@ export class CreateEmployeeDto {
 
   @ApiPropertyOptional({ example: 'Employee', enum: ['HR', 'Manager', 'Employee'] })
   @IsOptional()
-  @IsString()
+  @IsIn(['HR', 'Manager', 'Employee'])
   role?: string;
 }

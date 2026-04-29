@@ -9,6 +9,7 @@ interface EmployeesProps { userRole: UserRole; }
 type EmployeeFormState = Omit<Employee, '_id'>;
 
 const emptyEmployee: EmployeeFormState = {
+  userId: '',
   fullName: '',
   email: '',
   phone: '',
@@ -17,11 +18,8 @@ const emptyEmployee: EmployeeFormState = {
   location: '',
   employmentType: 'Full-time',
   status: 'Active',
-  managerName: '',
   yearsOfExperience: 0,
   skillsCount: 0,
-  activitiesCount: 0,
-  specializedSkills: [],
   bio: '',
   joinedAt: '',
   education: [],
@@ -94,6 +92,7 @@ export function Employees({ userRole }: EmployeesProps) {
     if (user) {
       setForm({
         ...form,
+        userId: user._id,
         fullName: user.name,
         email: user.email,
       });
@@ -104,11 +103,26 @@ export function Employees({ userRole }: EmployeesProps) {
     setSaving(true);
     setError('');
     try {
+      // Required fields validation
+      if (!form.userId && !editingEmployee) {
+        setError('Please select a user.');
+        return;
+      }
+      if (!form.department) {
+        setError('Department is required.');
+        return;
+      }
+      if (!form.position) {
+        setError('Position is required.');
+        return;
+      }
+
       const phone = (form.phone || '').trim();
       const joinedAt = (form.joinedAt || '').trim();
 
-      if (phone && !/^\d{8}$/.test(phone)) {
-        setError('Phone must contain exactly 8 digits.');
+      // Phone validation: must start with +216 followed by 8 digits
+      if (phone && !/^\+216\d{8}$/.test(phone)) {
+        setError('Phone must start with +216 followed by 8 digits (e.g., +21698765432).');
         return;
       }
 
@@ -117,20 +131,10 @@ export function Employees({ userRole }: EmployeesProps) {
         return;
       }
 
-      const specializedSkills = (form.specializedSkills || [])
-        .map((skill) => skill.trim())
-        .filter(Boolean);
-
-      if (!editingEmployee && specializedSkills.length === 0) {
-        setError('Specialized Skills is required. Add at least one skill.');
-        return;
-      }
-
       const payload = {
         ...form,
         phone,
         joinedAt,
-        specializedSkills,
       };
 
       if (editingEmployee) await employeesApi.update(editingEmployee._id, payload);
@@ -230,7 +234,7 @@ export function Employees({ userRole }: EmployeesProps) {
           />
         </div>
         <div>
-          <label className="block text-sm mb-2 text-gray-700">Department</label>
+          <label className="block text-sm mb-2 text-gray-700">Department *</label>
           <select
             value={form.department || ''}
             onChange={(e) => setForm({ ...form, department: e.target.value })}
@@ -243,7 +247,7 @@ export function Employees({ userRole }: EmployeesProps) {
           </select>
         </div>
         <div>
-          <label className="block text-sm mb-2 text-gray-700">Position</label>
+          <label className="block text-sm mb-2 text-gray-700">Position *</label>
           <input 
             value={form.position || ''} 
             onChange={(e) => setForm({ ...form, position: e.target.value })} 
@@ -259,37 +263,40 @@ export function Employees({ userRole }: EmployeesProps) {
           />
         </div>
         <div>
-          <label className="block text-sm mb-2 text-gray-700">Employment Type</label>
-          <input 
-            value={form.employmentType || ''} 
-            onChange={(e) => setForm({ ...form, employmentType: e.target.value })} 
-            className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" 
-          />
+          <label className="block text-sm mb-2 text-gray-700">Employment Type *</label>
+          <select
+            value={form.employmentType || 'Full-time'}
+            onChange={(e) => setForm({ ...form, employmentType: e.target.value as any })}
+            className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="Full-time">Full-time</option>
+            <option value="Part-time">Part-time</option>
+            <option value="Contract">Contract</option>
+            <option value="Intern">Intern</option>
+            <option value="Freelance">Freelance</option>
+          </select>
         </div>
         <div>
-          <label className="block text-sm mb-2 text-gray-700">Status</label>
-          <input 
-            value={form.status || ''} 
-            onChange={(e) => setForm({ ...form, status: e.target.value })} 
-            className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" 
-          />
+          <label className="block text-sm mb-2 text-gray-700">Status *</label>
+          <select
+            value={form.status || 'Active'}
+            onChange={(e) => setForm({ ...form, status: e.target.value as any })}
+            className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+            <option value="On Leave">On Leave</option>
+            <option value="Suspended">Suspended</option>
+            <option value="Left Company">Left Company</option>
+          </select>
         </div>
         <div>
-          <label className="block text-sm mb-2 text-gray-700">Manager Name</label>
-          <input 
-            value={form.managerName || ''} 
-            onChange={(e) => setForm({ ...form, managerName: e.target.value })} 
-            className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" 
-          />
-        </div>
-        <div>
-          <label className="block text-sm mb-2 text-gray-700">Phone (8 digits)</label>
-          <input 
-            value={form.phone || ''} 
-            maxLength={8} 
-            onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })} 
-            className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" 
-            placeholder="22587469" 
+          <label className="block text-sm mb-2 text-gray-700">Phone (+216...)</label>
+          <input
+            value={form.phone || ''}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            placeholder="+21698765432"
           />
         </div>
         <div>
@@ -308,24 +315,6 @@ export function Employees({ userRole }: EmployeesProps) {
             value={form.yearsOfExperience || 0} 
             onChange={(e) => setForm({ ...form, yearsOfExperience: Number(e.target.value) })} 
             className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" 
-          />
-        </div>
-        <div>
-          <label className="block text-sm mb-2 text-gray-700">Activities Count</label>
-          <input 
-            type="number" 
-            value={form.activitiesCount || 0} 
-            onChange={(e) => setForm({ ...form, activitiesCount: Number(e.target.value) })} 
-            className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" 
-          />
-        </div>
-        <div className="md:col-span-2">
-          <label className="block text-sm mb-2 text-gray-700">Specialized Skills (comma separated) *</label>
-          <input 
-            value={(form.specializedSkills || []).join(', ')} 
-            onChange={(e) => setForm({ ...form, specializedSkills: e.target.value.split(',').map((skill) => skill.trim()).filter(Boolean) })} 
-            className="w-full px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" 
-            placeholder="React, Node.js, Communication" 
           />
         </div>
         <div className="md:col-span-2">

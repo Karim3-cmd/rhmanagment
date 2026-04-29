@@ -7,7 +7,7 @@ export type SkillDocument = HydratedDocument<Skill>;
 export class SkillAssignment {
   @Prop({ type: Types.ObjectId, required: true }) employeeId: Types.ObjectId;
   @Prop({ required: true }) employeeName: string;
-  @Prop({ required: true, min: 1, max: 5 }) level: number;
+  @Prop({ default: 1, min: 1, max: 5 }) level: number;
   @Prop({ default: '' }) notes: string;
   @Prop({ default: 0, min: 0 }) yearsOfExperience: number;
   @Prop({ default: '' }) certificateName: string;

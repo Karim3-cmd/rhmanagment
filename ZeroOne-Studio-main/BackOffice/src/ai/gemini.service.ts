@@ -104,7 +104,7 @@ export class GeminiService {
   /**
    * Extract required skills from natural language text using Gemini with fallback
    */
-  private async extractSkills(text: string): Promise<string[]> {
+  async extractSkills(text: string): Promise<string[]> {
     this.logger.log(`Extracting skills from: "${text}"`);
 
     const prompt = `Analyze this text and extract only the technical skills or job roles mentioned. Return ONLY a comma-separated list of skill names. Do not include explanations.
@@ -139,7 +139,7 @@ Skills (comma-separated only):`;
   /**
    * Call Gemini API with logging
    */
-  private async callGemini(prompt: string): Promise<string> {
+  async callGemini(prompt: string): Promise<string> {
     this.logger.log(`Calling Gemini API...`);
 
     try {

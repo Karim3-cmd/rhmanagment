@@ -17,10 +17,35 @@ import type {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+const TOKEN_KEY = 'hrbrain_token';
+
+export const getToken = (): string | null => localStorage.getItem(TOKEN_KEY);
+export const setToken = (token: string): void => localStorage.setItem(TOKEN_KEY, token);
+export const removeToken = (): void => localStorage.removeItem(TOKEN_KEY);
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
+
+api.interceptors.request.use((config) => {
+  const token = getToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      removeToken();
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
 
 export interface RegisterPayload {
   name: string;
@@ -44,8 +69,14 @@ export const authApi = {
   },
   async login(payload: LoginPayload, customHeaders?: Record<string, string>) {
     const config = customHeaders ? { headers: customHeaders } : {};
-    const { data } = await api.post<{ message: string; user: User }>('/auth/login', payload, config);
+    const { data } = await api.post<{ message: string; access_token: string; user: User }>('/auth/login', payload, config);
+    if (data.access_token) {
+      setToken(data.access_token);
+    }
     return data;
+  },
+  logout() {
+    removeToken();
   },
   async listUsers(customHeaders?: Record<string, string>) {
     const config = customHeaders ? { headers: customHeaders } : {};
@@ -145,7 +176,7 @@ export const skillsApi = {
     const { data } = await api.delete<{ message: string }>(`/skills/${id}`, config);
     return data;
   },
-  async assign(skillId: string, payload: { employeeId: string; level: number; notes?: string; yearsOfExperience?: number; certificateName?: string; certificateUrl?: string; evidenceNote?: string; validated?: boolean; validatedBy?: string }, customHeaders?: Record<string, string>) {
+  async assign(skillId: string, payload: { employeeId: string; notes?: string; yearsOfExperience?: number; certificateName?: string; certificateUrl?: string; evidenceNote?: string; validated?: boolean; validatedBy?: string }, customHeaders?: Record<string, string>) {
     const config = customHeaders ? { headers: customHeaders } : {};
     const { data } = await api.post<Skill>(`/skills/${skillId}/assign`, payload, config);
     return data;
@@ -236,7 +267,7 @@ export const activitiesApi = {
 };
 
 export const recommendationsApi = {
-  async list(params?: { search?: string; status?: string; employeeId?: string; activityId?: string; skill?: string; matchLevel?: string }, customHeaders?: Record<string, string>) {
+  async list(params?: { search?: string; skill?: string; matchLevel?: string; status?: string; employeeId?: string; activityId?: string }, customHeaders?: Record<string, string>) {
     const config = customHeaders ? { params, headers: customHeaders } : { params };
     const { data } = await api.get<{ total: number; items: Recommendation[] }>('/recommendations', config);
     return data;
@@ -244,6 +275,28 @@ export const recommendationsApi = {
   async refresh(customHeaders?: Record<string, string>) {
     const config = customHeaders ? { headers: customHeaders } : {};
     const { data } = await api.post<{ total: number; items: Recommendation[] }>('/recommendations/refresh', {}, config);
+    return data;
+  },
+  async matchJobDescription(payload: { jobDescription: string; department?: string; minYearsExperience?: number }, customHeaders?: Record<string, string>) {
+    const config = customHeaders ? { headers: customHeaders } : {};
+    const { data } = await api.post<{
+      total: number;
+      requiredSkills: string[];
+      items: Array<{
+        employee: {
+          _id: string;
+          fullName: string;
+          email: string;
+          department: string;
+          position: string;
+          yearsOfExperience: number;
+        };
+        score: number;
+        explanation: string;
+        matchedSkills: string[];
+        missingSkills: string[];
+      }>;
+    }>('/recommendations/job-match', payload, config);
     return data;
   },
   async updateStatus(id: string, status: Recommendation['status'], customHeaders?: Record<string, string>) {

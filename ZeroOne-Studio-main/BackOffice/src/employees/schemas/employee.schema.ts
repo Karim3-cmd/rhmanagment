@@ -30,22 +30,28 @@ export class CertificationItem {
 
 export const CertificationItemSchema = SchemaFactory.createForClass(CertificationItem);
 
+export type EmploymentType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern' | 'Freelance';
+export type EmployeeStatus = 'Active' | 'Inactive' | 'On Leave' | 'Suspended' | 'Left Company';
+
 @Schema({ timestamps: true })
 export class Employee {
+  @Prop({ required: true }) userId: string;
   @Prop({ required: true, trim: true }) fullName: string;
   @Prop({ required: true, unique: true, lowercase: true, trim: true }) email: string;
-  @Prop({ default: '' }) phone: string;
-  @Prop({ default: '' }) department: string;
-  @Prop({ default: '' }) position: string;
+  @Prop({ required: true }) department: string;
+  @Prop({ required: true }) position: string;
   @Prop({ default: '' }) location: string;
-  @Prop({ default: '' }) employmentType: string;
-  @Prop({ default: 'Active' }) status: string;
-  @Prop({ default: '' }) managerName: string;
+  @Prop({ default: 'Full-time', enum: ['Full-time', 'Part-time', 'Contract', 'Intern', 'Freelance'] })
+  employmentType: EmploymentType;
+  @Prop({ default: 'Active', enum: ['Active', 'Inactive', 'On Leave', 'Suspended', 'Left Company'] })
+  status: EmployeeStatus;
+  @Prop({ default: '' }) phone: string;
+  @Prop({ default: '' }) joinedAt: string;
   @Prop({ default: 0 }) yearsOfExperience: number;
+  @Prop({ default: '' }) bio: string;
+  @Prop({ default: '' }) managerName: string;
   @Prop({ default: 0 }) skillsCount: number;
   @Prop({ default: 0 }) activitiesCount: number;
-  @Prop({ default: '' }) bio: string;
-  @Prop({ default: '' }) joinedAt: string;
   @Prop({ type: [String], default: [] }) specializedSkills: string[];
   @Prop({ type: [EducationItemSchema], default: [] }) education: EducationItem[];
   @Prop({ type: [CertificationItemSchema], default: [] }) certifications: CertificationItem[];

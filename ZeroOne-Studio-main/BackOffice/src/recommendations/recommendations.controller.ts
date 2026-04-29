@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { JobDescriptionDto } from './dto/job-description.dto';
 import { QueryRecommendationsDto } from './dto/query-recommendations.dto';
 import { UpdateRecommendationStatusDto } from './dto/update-recommendation-status.dto';
 import { RecommendationsService } from './recommendations.service';
@@ -25,5 +26,11 @@ export class RecommendationsController {
   @ApiOperation({ summary: 'Update recommendation status' })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateRecommendationStatusDto) {
     return this.recommendationsService.updateStatus(id, dto);
+  }
+
+  @Post('job-match')
+  @ApiOperation({ summary: 'Match employees to job description using AI' })
+  matchJobDescription(@Body() dto: JobDescriptionDto) {
+    return this.recommendationsService.matchJobDescription(dto);
   }
 }

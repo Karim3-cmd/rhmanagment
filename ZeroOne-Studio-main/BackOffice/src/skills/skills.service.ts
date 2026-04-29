@@ -164,7 +164,6 @@ export class SkillsService {
     );
 
     if (existing) {
-      existing.level = dto.level;
       existing.notes = dto.notes || '';
       existing.employeeName = employee.fullName;
       existing.yearsOfExperience = dto.yearsOfExperience || 0;
@@ -177,7 +176,7 @@ export class SkillsService {
       skill.assignments.push({
         employeeId: new Types.ObjectId(dto.employeeId),
         employeeName: employee.fullName,
-        level: dto.level,
+        level: 1,
         notes: dto.notes || '',
         yearsOfExperience: dto.yearsOfExperience || 0,
         certificateName: dto.certificateName || '',

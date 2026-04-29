@@ -29,22 +29,26 @@ export interface CertificationItem {
   credentialUrl?: string;
 }
 
+export type EmploymentType = 'Full-time' | 'Part-time' | 'Contract' | 'Intern' | 'Freelance';
+export type EmployeeStatus = 'Active' | 'Inactive' | 'On Leave' | 'Suspended' | 'Left Company';
+
 export interface Employee {
   _id: string;
+  userId: string;
   fullName: string;
   email: string;
-  phone?: string;
-  department?: string;
-  position?: string;
+  department: string;
+  position: string;
   location?: string;
-  employmentType?: string;
-  status?: string;
-  managerName?: string;
+  employmentType?: EmploymentType;
+  status?: EmployeeStatus;
+  phone?: string;
+  joinedAt?: string;
   yearsOfExperience?: number;
+  bio?: string;
+  managerName?: string;
   skillsCount?: number;
   activitiesCount?: number;
-  bio?: string;
-  joinedAt?: string;
   specializedSkills?: string[];
   education?: EducationItem[];
   certifications?: CertificationItem[];
@@ -56,7 +60,7 @@ export interface Employee {
 export interface SkillAssignment {
   employeeId: string;
   employeeName: string;
-  level: number;
+  level?: number;
   notes?: string;
   yearsOfExperience?: number;
   certificateName?: string;

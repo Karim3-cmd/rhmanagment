@@ -8,6 +8,7 @@ import { Analytics } from '../views/Analytics';
 import { Profile } from '../views/Profile';
 import { Settings } from '../views/Settings';
 import { Departments } from '../views/Departments';
+import { JobMatching } from '../views/JobMatching';
 import type { User } from '../../lib/types';
 
 interface DashboardProps {
@@ -15,7 +16,7 @@ interface DashboardProps {
   onLogout: () => void;
 }
 
-export type ViewType = 'employees' | 'skills' | 'activities' | 'recommendations' | 'analytics' | 'profile' | 'settings' | 'departments';
+export type ViewType = 'employees' | 'skills' | 'activities' | 'recommendations' | 'analytics' | 'profile' | 'settings' | 'departments' | 'job-matching';
 
 export function Dashboard({ user, onLogout }: DashboardProps) {
   const [currentView, setCurrentView] = useState<ViewType>('activities');
@@ -29,8 +30,9 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
       case 'recommendations': return <Recommendations userRole={user.role} user={user} />;
       case 'analytics': return <Analytics userRole={user.role} />;
       case 'profile': return <Profile user={user} />;
-      case 'settings': return <Settings user={user} onLogout={onLogout} />;
+      case 'settings': return <Settings user={user} />;
       case 'departments': return <Departments userRole={user.role} user={user} />;
+      case 'job-matching': return <JobMatching />;
       default: return <Activities userRole={user.role} user={user} />;
     }
   };
@@ -44,6 +46,7 @@ export function Dashboard({ user, onLogout }: DashboardProps) {
         userName={user.name} 
         isCollapsed={isSidebarCollapsed} 
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+        onLogout={onLogout}
       />
       <main className={`flex-1 overflow-auto transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>{renderView()}</main>
     </div>

@@ -1,14 +1,18 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { InjectModel } from '@nestjs/mongoose';
 import { randomBytes, scryptSync, timingSafeEqual } from 'crypto';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../users/schemas/user.schema';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
-  constructor(@InjectModel(User.name) private readonly userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    private readonly jwtService: JwtService,
+  ) {}
 
   private hashPassword(password: string) {
     const salt = randomBytes(16).toString('hex');
@@ -36,6 +40,7 @@ export class AuthService {
     }
 
     const created = await this.userModel.create({
+      _id: new Types.ObjectId().toString(),
       ...dto,
       email,
       passwordHash: this.hashPassword(dto.password),
@@ -55,8 +60,16 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    const payload = {
+      sub: user._id,
+      email: user.email,
+      role: user.role,
+      department: user.department,
+    };
+
     return {
       message: 'Login successful',
+      access_token: this.jwtService.sign(payload),
       user: this.sanitize(user),
     };
   }
