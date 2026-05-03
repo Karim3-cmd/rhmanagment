@@ -1,0 +1,89 @@
+pipeline {
+    agent {
+        docker {
+            image 'node:20-alpine'
+            args '-u root'
+        }
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        SONAR_TOKEN      = credentials('SONAR_TOKEN')
+        SONAR_HOST_URL   = 'http://localhost:9000'
+        SONAR_PROJECT_KEY = 'hrbrain-backend'
+    }
+
+    stages {
+
+        stage('Install') {
+            steps {
+                dir('ZeroOne-Studio-main/BackOffice') {
+                    sh 'npm ci'
+                }
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                dir('ZeroOne-Studio-main/BackOffice') {
+                    sh 'npm run lint'
+                }
+            }
+        }
+
+        stage('Test & Coverage') {
+            steps {
+                dir('ZeroOne-Studio-main/BackOffice') {
+                    sh 'npm run test:cov -- --reporters=default --reporters=jest-junit'
+                }
+            }
+            post {
+                always {
+                    // Publier les résultats JUnit
+                    junit allowEmptyResults: true,
+                          testResults: 'ZeroOne-Studio-main/BackOffice/junit.xml'
+                    // Archiver le rapport de couverture LCOV
+                    archiveArtifacts artifacts: 'ZeroOne-Studio-main/BackOffice/coverage/**',
+                                     allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                dir('ZeroOne-Studio-main/BackOffice') {
+                    sh """
+                        npx sonar-scanner \
+                          -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                          -Dsonar.sources=src \
+                          -Dsonar.tests=src \
+                          -Dsonar.test.inclusions=**/*.spec.ts \
+                          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                          -Dsonar.host.url=${SONAR_HOST_URL} \
+                          -Dsonar.token=${SONAR_TOKEN}
+                    """
+                }
+            }
+        }
+
+    }
+
+    post {
+        success {
+            echo '✅ CI Backend réussi — déclenchement du CD Backend...'
+            build job: 'cd-backend',
+                  parameters: [string(name: 'GIT_COMMIT_SHA', value: env.GIT_COMMIT)],
+                  wait: false
+        }
+        failure {
+            echo '❌ CI Backend échoué — le CD Backend ne sera pas déclenché.'
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

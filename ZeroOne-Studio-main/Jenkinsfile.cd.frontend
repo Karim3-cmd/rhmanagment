@@ -1,0 +1,74 @@
+pipeline {
+    agent {
+        docker {
+            image 'docker:24-dind'
+            args  '--privileged -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        string(name: 'GIT_COMMIT_SHA', defaultValue: '', description: 'SHA du commit à déployer')
+    }
+
+    environment {
+        REGISTRY_CREDENTIALS = credentials('DOCKER_REGISTRY_CREDENTIALS')
+        REGISTRY_URL         = 'docker.io'
+        IMAGE_NAME           = "${REGISTRY_CREDENTIALS_USR}/hrbrain-frontend"
+        IMAGE_TAG            = "${params.GIT_COMMIT_SHA ?: env.GIT_COMMIT}"
+    }
+
+    // CD uniquement depuis la branche principale
+    when {
+        branch 'main'
+    }
+
+    stages {
+
+        stage('Build Docker Image') {
+            steps {
+                dir('ZeroOne-Studio-main/FrontOffice') {
+                    sh """
+                        docker build \
+                          -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                          -t ${IMAGE_NAME}:latest \
+                          -f Dockerfile .
+                    """
+                }
+            }
+        }
+
+        stage('Push to Registry') {
+            steps {
+                sh """
+                    echo "${REGISTRY_CREDENTIALS_PSW}" | \
+                      docker login ${REGISTRY_URL} -u "${REGISTRY_CREDENTIALS_USR}" --password-stdin
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push ${IMAGE_NAME}:latest
+                """
+            }
+            post {
+                always {
+                    sh 'docker logout ${REGISTRY_URL} || true'
+                }
+            }
+        }
+
+    }
+
+    post {
+        success {
+            echo "✅ CD Frontend réussi — image ${IMAGE_NAME}:${IMAGE_TAG} déployée."
+        }
+        failure {
+            echo '❌ CD Frontend échoué — aucune image déployée.'
+        }
+        always {
+            cleanWs()
+        }
+    }
+}
