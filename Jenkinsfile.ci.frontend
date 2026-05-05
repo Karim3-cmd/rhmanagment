@@ -1,0 +1,102 @@
+pipeline {
+    agent {
+        docker {
+            image 'node:20-alpine'
+            args '-u root'
+        }
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
+    }
+
+    environment {
+        SONAR_TOKEN    = credentials('SONAR_TOKEN')
+        SONAR_HOST_URL = 'http://sonarqube:9000'
+        FRONTEND_DIR   = 'ZeroOne-Studio-main/FrontOffice'
+    }
+
+    stages {
+        stage('Resolve Workspace') {
+            steps {
+                script {
+                    if (!fileExists("${env.FRONTEND_DIR}/package.json") && fileExists('FrontOffice/package.json')) {
+                        env.FRONTEND_DIR = 'FrontOffice'
+                    }
+                    echo "Frontend directory: ${env.FRONTEND_DIR}"
+                }
+            }
+        }
+
+        stage('Install') {
+            steps {
+                dir(env.FRONTEND_DIR) {
+                    sh 'npm ci || npm install --no-audit --no-fund'
+                }
+            }
+        }
+
+        stage('Test & Coverage') {
+            steps {
+                dir(env.FRONTEND_DIR) {
+                    sh 'npm run test:coverage'
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: "${env.FRONTEND_DIR}/test-results/junit.xml"
+                    archiveArtifacts artifacts: "${env.FRONTEND_DIR}/coverage/**", allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir(env.FRONTEND_DIR) {
+                    sh 'npm run build'
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: "${env.FRONTEND_DIR}/dist/**", allowEmptyArchive: true
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                dir(env.FRONTEND_DIR) {
+                    sh '''
+                        test -n "$SONAR_TOKEN" || { echo "Missing Jenkins credential: SONAR_TOKEN"; exit 1; }
+                        npx sonar-scanner \
+                          -Dsonar.host.url=${SONAR_HOST_URL} \
+                          -Dsonar.token=${SONAR_TOKEN}
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            script {
+                if (env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main') {
+                    echo '✅ CI Frontend réussi — déclenchement du CD Frontend...'
+                    build job: 'cd-frontend',
+                          parameters: [string(name: 'GIT_COMMIT_SHA', value: env.GIT_COMMIT)],
+                          wait: false
+                } else {
+                    echo "✅ CI Frontend réussi — CD ignoré car branche=${env.BRANCH_NAME ?: env.GIT_BRANCH}"
+                }
+            }
+        }
+        failure {
+            echo '❌ CI Frontend échoué — le CD Frontend ne sera pas déclenché.'
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

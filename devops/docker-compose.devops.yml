@@ -1,0 +1,157 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: hrbrain-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - hrbrain_net
+
+  backend:
+    build:
+      context: ../BackOffice
+      dockerfile: Dockerfile
+    container_name: hrbrain-backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGODB_URI: mongodb://mongodb:27017/hrbrain
+      JWT_SECRET: change-this-secret
+    depends_on:
+      - mongodb
+    ports:
+      - "3000:3000"
+    networks:
+      - hrbrain_net
+
+  frontend:
+    build:
+      context: ../FrontOffice
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+    container_name: hrbrain-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    networks:
+      - hrbrain_net
+
+  sonarqube-db:
+    image: postgres:16-alpine
+    container_name: hrbrain-sonarqube-db
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonarqube_db:/var/lib/postgresql/data
+    networks:
+      - hrbrain_net
+
+  sonarqube:
+    image: sonarqube:community
+    container_name: hrbrain-sonarqube
+    depends_on:
+      - sonarqube-db
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    networks:
+      - hrbrain_net
+
+  jenkins:
+    image: jenkins/jenkins:lts-jdk21
+    container_name: hrbrain-jenkins
+    user: root
+    ports:
+      - "8081:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - hrbrain_net
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: hrbrain-blackbox-exporter
+    ports:
+      - "9115:9115"
+    networks:
+      - hrbrain_net
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: hrbrain-prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      - backend
+      - frontend
+      - alertmanager
+      - blackbox-exporter
+    ports:
+      - "9090:9090"
+    networks:
+      - hrbrain_net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: hrbrain-alertmanager
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - hrbrain_net
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: hrbrain-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    ports:
+      - "3001:3000"
+    networks:
+      - hrbrain_net
+
+networks:
+  hrbrain_net:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  jenkins_home:
+  sonarqube_db:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:

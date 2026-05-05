@@ -1,0 +1,54 @@
+groups:
+  - name: hrbrain-availability
+    rules:
+      - alert: BackendDown
+        expr: up{job="hrbrain-backend-metrics"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: backend
+        annotations:
+          summary: "HRBrain backend is down"
+          description: "Prometheus cannot scrape the backend /metrics endpoint for more than 1 minute."
+
+      - alert: FrontendDown
+        expr: probe_success{job="hrbrain-frontend-health"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: frontend
+        annotations:
+          summary: "HRBrain frontend is down"
+          description: "The frontend /health endpoint is not returning HTTP 2xx."
+
+      - alert: SonarQubeDown
+        expr: probe_success{job="sonarqube-health"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: sonarqube
+        annotations:
+          summary: "SonarQube is unreachable"
+          description: "SonarQube is needed for quality gate validation in CI."
+
+      - alert: JenkinsDown
+        expr: probe_success{job="jenkins-health"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: jenkins
+        annotations:
+          summary: "Jenkins is unreachable"
+          description: "Jenkins login page is not reachable through blackbox exporter."
+
+  - name: hrbrain-resource-risk
+    rules:
+      - alert: BackendHighMemory
+        expr: hrbrain_api_memory_rss_bytes > 700000000
+        for: 3m
+        labels:
+          severity: warning
+          service: backend
+        annotations:
+          summary: "Backend memory usage is high"
+          description: "Backend RSS memory is above 700 MB for more than 3 minutes."

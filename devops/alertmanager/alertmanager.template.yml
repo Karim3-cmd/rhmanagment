@@ -1,0 +1,23 @@
+# Copy this file to alertmanager.yml and replace the variables with your real SMTP values.
+global:
+  resolve_timeout: 5m
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'alerts@your-domain.com'
+  smtp_auth_username: 'alerts@your-domain.com'
+  smtp_auth_password: 'APP_PASSWORD_HERE'
+  smtp_require_tls: true
+
+route:
+  receiver: admin-email
+  group_by: ['alertname', 'service']
+  group_wait: 20s
+  group_interval: 2m
+  repeat_interval: 1h
+
+receivers:
+  - name: admin-email
+    email_configs:
+      - to: 'admin@your-domain.com'
+        send_resolved: true
+        headers:
+          subject: '[HRBrain Alert] {{ .CommonLabels.alertname }} - {{ .CommonLabels.severity }}'

@@ -1,0 +1,8 @@
+resources:
+  - ../namespace.yaml
+  - prometheus-rbac.yaml
+  - prometheus-config.yaml
+  - prometheus.yaml
+  - blackbox-exporter.yaml
+  - alertmanager.yaml
+  - grafana.yaml

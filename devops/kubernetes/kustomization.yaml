@@ -1,0 +1,9 @@
+resources:
+  - namespace.yaml
+  - apps/mongodb.yaml
+  - apps/backend-service.yaml
+  - apps/backend-deployment.yaml
+  - apps/frontend-service.yaml
+  - apps/frontend-deployment.yaml
+  - network/ingress.yaml
+  - network/network-policies.yaml

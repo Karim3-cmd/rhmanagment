@@ -1,0 +1,137 @@
+pipeline {
+    agent {
+        docker {
+            image 'docker:27-cli'
+            args  '-u root -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
+
+    options {
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
+    }
+
+    parameters {
+        string(name: 'GIT_COMMIT_SHA', defaultValue: '', description: 'SHA du commit à déployer')
+        string(name: 'FRONTEND_API_URL', defaultValue: 'http://api.hrbrain.local', description: 'URL publique du backend utilisée par Vite')
+    }
+
+    environment {
+        REGISTRY_CREDENTIALS = credentials('DOCKER_REGISTRY_CREDENTIALS')
+        REGISTRY_URL         = 'docker.io'
+        IMAGE_NAME           = "${REGISTRY_CREDENTIALS_USR}/hrbrain-frontend"
+        IMAGE_TAG            = "${params.GIT_COMMIT_SHA ?: env.GIT_COMMIT}"
+        FRONTEND_DIR         = 'ZeroOne-Studio-main/FrontOffice'
+        K8S_DIR              = 'ZeroOne-Studio-main/devops/kubernetes'
+        K8S_NAMESPACE        = 'hrbrain'
+    }
+
+    stages {
+        stage('Resolve Workspace') {
+            steps {
+                script {
+                    if (!fileExists("${env.FRONTEND_DIR}/Dockerfile") && fileExists('FrontOffice/Dockerfile')) {
+                        env.FRONTEND_DIR = 'FrontOffice'
+                        env.K8S_DIR = 'devops/kubernetes'
+                    }
+                    echo "Frontend directory: ${env.FRONTEND_DIR}"
+                    echo "Kubernetes directory: ${env.K8S_DIR}"
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                dir(env.FRONTEND_DIR) {
+                    sh '''
+                        docker build \
+                          --build-arg VITE_API_URL=${FRONTEND_API_URL} \
+                          -t ${IMAGE_NAME}:${IMAGE_TAG} \
+                          -t ${IMAGE_NAME}:latest \
+                          -f Dockerfile .
+                    '''
+                }
+            }
+        }
+
+        stage('Push to Registry') {
+            steps {
+                sh '''
+                    test -n "$REGISTRY_CREDENTIALS_USR" || { echo "Missing Jenkins credential: DOCKER_REGISTRY_CREDENTIALS"; exit 1; }
+                    echo "${REGISTRY_CREDENTIALS_PSW}" | docker login ${REGISTRY_URL} -u "${REGISTRY_CREDENTIALS_USR}" --password-stdin
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push ${IMAGE_NAME}:latest
+                '''
+            }
+            post {
+                always {
+                    sh 'docker logout ${REGISTRY_URL} || true'
+                }
+            }
+        }
+
+        stage('Deploy to kubeadm') {
+            steps {
+                withCredentials([file(credentialsId: 'KUBECONFIG_PROD', variable: 'KUBECONFIG_FILE')]) {
+                    sh '''
+                        docker run --rm \
+                          -v "$PWD":/workspace \
+                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
+                          -e KUBECONFIG=/kubeconfig \
+                          bitnami/kubectl:1.30 \
+                          apply -f /workspace/${K8S_DIR}/namespace.yaml
+
+                        docker run --rm \
+                          -v "$PWD":/workspace \
+                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
+                          -e KUBECONFIG=/kubeconfig \
+                          bitnami/kubectl:1.30 \
+                          apply -f /workspace/${K8S_DIR}/apps/frontend-service.yaml
+
+                        sed "s#__FRONTEND_IMAGE__#${IMAGE_NAME}:${IMAGE_TAG}#g" ${K8S_DIR}/apps/frontend-deployment.yaml > /tmp/frontend-deployment.yaml
+
+                        docker run --rm \
+                          -v /tmp/frontend-deployment.yaml:/manifest.yaml:ro \
+                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
+                          -e KUBECONFIG=/kubeconfig \
+                          bitnami/kubectl:1.30 \
+                          apply -f /manifest.yaml
+
+                        docker run --rm \
+                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
+                          -e KUBECONFIG=/kubeconfig \
+                          bitnami/kubectl:1.30 \
+                          -n ${K8S_NAMESPACE} rollout status deployment/hrbrain-frontend --timeout=180s
+
+                        docker run --rm \
+                          -v "$PWD":/workspace \
+                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
+                          -e KUBECONFIG=/kubeconfig \
+                          bitnami/kubectl:1.30 \
+                          apply -f /workspace/${K8S_DIR}/network/ingress.yaml
+
+                        docker run --rm \
+                          -v "$PWD":/workspace \
+                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
+                          -e KUBECONFIG=/kubeconfig \
+                          bitnami/kubectl:1.30 \
+                          apply -f /workspace/${K8S_DIR}/network/network-policies.yaml
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ CD Frontend réussi — image ${IMAGE_NAME}:${IMAGE_TAG} déployée sur kubeadm."
+        }
+        failure {
+            echo '❌ CD Frontend échoué — image non déployée ou rollout bloqué.'
+        }
+        always {
+            cleanWs()
+        }
+    }
+}

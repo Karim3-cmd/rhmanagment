@@ -1,0 +1,95 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hrbrain-backend-config
+  namespace: hrbrain
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  MONGODB_URI: "mongodb://mongodb.hrbrain.svc.cluster.local:27017/hrbrain"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: hrbrain-backend-secret
+  namespace: hrbrain
+type: Opaque
+stringData:
+  JWT_SECRET: "change-this-secret-in-production"
+  GEMINI_API_KEY: "replace-me-if-ai-module-is-used"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hrbrain-backend
+  namespace: hrbrain
+  labels:
+    app: hrbrain-backend
+spec:
+  replicas: 2
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: hrbrain-backend
+  template:
+    metadata:
+      labels:
+        app: hrbrain-backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: backend
+          image: __BACKEND_IMAGE__
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: hrbrain-backend-config
+            - secretRef:
+                name: hrbrain-backend-secret
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: 700m
+              memory: 768Mi
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: hrbrain-backend-hpa
+  namespace: hrbrain
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hrbrain-backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
