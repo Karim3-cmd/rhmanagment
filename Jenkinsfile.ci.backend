@@ -33,7 +33,7 @@ pipeline {
         stage('Install') {
             steps {
                 dir(env.BACKEND_DIR) {
-                    sh 'npm ci || npm install --no-audit --no-fund'
+                    sh 'npm install --no-audit --no-fund'
                 }
             }
         }
