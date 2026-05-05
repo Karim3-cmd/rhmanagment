@@ -21,8 +21,8 @@ pipeline {
         REGISTRY_URL         = 'docker.io'
         IMAGE_NAME           = "${REGISTRY_CREDENTIALS_USR}/hrbrain-backend"
         IMAGE_TAG            = "${params.GIT_COMMIT_SHA ?: env.GIT_COMMIT}"
-        BACKEND_DIR          = 'ZeroOne-Studio-main/BackOffice'
-        K8S_DIR              = 'ZeroOne-Studio-main/devops/kubernetes'
+        BACKEND_DIR          = 'BackOffice'
+        K8S_DIR              = 'devops/kubernetes'
         K8S_NAMESPACE        = 'hrbrain'
     }
 
