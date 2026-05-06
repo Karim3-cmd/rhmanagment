@@ -64,7 +64,8 @@ pipeline {
                 dir(env.BACKEND_DIR) {
                     sh '''
                         test -n "$SONAR_TOKEN" || { echo "Missing Jenkins credential: SONAR_TOKEN"; exit 1; }
-                        npx sonar-scanner \
+                        npm install -g sonarqube-scanner --no-audit --no-fund
+                        sonar-scanner \
                           -Dsonar.host.url=${SONAR_HOST_URL} \
                           -Dsonar.token=${SONAR_TOKEN}
                     '''
