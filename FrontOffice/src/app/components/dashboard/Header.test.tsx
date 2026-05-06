@@ -76,7 +76,7 @@ describe('Header', () => {
   it('opens notification dropdown on bell click', async () => {
     render(<Header user={mockUser} currentView="employees" onViewChange={mockOnViewChange} onLogout={mockOnLogout} />);
     await waitFor(() => screen.getByText('1'));
-    fireEvent.click(screen.getByRole('button', { name: '' }));
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     await waitFor(() => {
       expect(screen.getByText('Notifications')).toBeInTheDocument();
     });
@@ -85,7 +85,7 @@ describe('Header', () => {
   it('shows notifications in dropdown', async () => {
     render(<Header user={mockUser} currentView="employees" onViewChange={mockOnViewChange} onLogout={mockOnLogout} />);
     await waitFor(() => screen.getByText('1'));
-    fireEvent.click(screen.getAllByRole('button')[0]);
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     await waitFor(() => {
       expect(screen.getByText('Test Notification')).toBeInTheDocument();
     });
@@ -94,7 +94,7 @@ describe('Header', () => {
   it('shows Mark all read in dropdown when unread', async () => {
     render(<Header user={mockUser} currentView="employees" onViewChange={mockOnViewChange} onLogout={mockOnLogout} />);
     await waitFor(() => screen.getByText('1'));
-    fireEvent.click(screen.getAllByRole('button')[0]);
+    fireEvent.click(screen.getByRole('button', { name: '1' }));
     await waitFor(() => {
       expect(screen.getByText('Mark all read')).toBeInTheDocument();
     });
