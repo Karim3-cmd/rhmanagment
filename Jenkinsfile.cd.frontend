@@ -72,6 +72,16 @@ pipeline {
         }
 
         stage('Deploy to kubeadm') {
+            when {
+                expression {
+                    try {
+                        withCredentials([file(credentialsId: 'KUBECONFIG_PROD', variable: 'KUBECONFIG_TEST')]) { return true }
+                    } catch (e) {
+                        echo '⚠️ KUBECONFIG_PROD not configured — skipping deploy stage.'
+                        return false
+                    }
+                }
+            }
             steps {
                 withCredentials([file(credentialsId: 'KUBECONFIG_PROD', variable: 'KUBECONFIG_FILE')]) {
                     sh '''
@@ -125,7 +135,7 @@ pipeline {
 
     post {
         success {
-            echo "✅ CD Frontend réussi — image ${IMAGE_NAME}:${IMAGE_TAG} déployée sur kubeadm."
+            echo "✅ CD Frontend réussi — image ${IMAGE_NAME}:${IMAGE_TAG} buildée et pushée sur Docker Hub."
         }
         failure {
             echo '❌ CD Frontend échoué — image non déployée ou rollout bloqué.'
