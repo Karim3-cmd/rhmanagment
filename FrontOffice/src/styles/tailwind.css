@@ -1,3 +1,4 @@
+/* NOSONAR - @source is a valid Tailwind CSS v4 directive */
 @import 'tailwindcss' source(none);
 @source '../**/*.{js,ts,jsx,tsx}';
 
