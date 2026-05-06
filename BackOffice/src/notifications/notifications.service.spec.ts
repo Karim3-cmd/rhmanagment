@@ -44,7 +44,7 @@ describe('NotificationsService', () => {
       mockNotificationModel.countDocuments.mockResolvedValue(0);
       mockNotificationModel.insertMany.mockResolvedValue([]);
 
-      const result = await service.seedForUser('u1');
+      const result = await service.seedForUser('507f1f77bcf86cd799439011');
       expect(result.message).toBe('Demo notifications seeded');
       expect(mockNotificationModel.insertMany).toHaveBeenCalled();
     });
@@ -52,7 +52,7 @@ describe('NotificationsService', () => {
     it('should not seed if notifications already exist', async () => {
       mockNotificationModel.countDocuments.mockResolvedValue(2);
 
-      const result = await service.seedForUser('u1');
+      const result = await service.seedForUser('507f1f77bcf86cd799439011');
       expect(result.message).toBe('Notifications already seeded');
       expect(mockNotificationModel.insertMany).not.toHaveBeenCalled();
     });
@@ -63,7 +63,7 @@ describe('NotificationsService', () => {
       mockNotificationModel.create.mockResolvedValue(mockNotification);
 
       const result = await service.create({
-        userId: 'u1',
+        userId: '507f1f77bcf86cd799439011',
         type: 'info',
         title: 'Test',
         message: 'Test',

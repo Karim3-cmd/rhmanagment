@@ -44,6 +44,7 @@ describe('SkillsService', () => {
     service = module.get<SkillsService>(SkillsService);
     jest.clearAllMocks();
     mockEmployeeModel.find.mockReturnValue({ select: jest.fn().mockResolvedValue([]) });
+    mockSkillModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]), sort: jest.fn().mockResolvedValue([]) });
   });
 
   describe('create', () => {
@@ -151,11 +152,11 @@ describe('SkillsService', () => {
     });
 
     it('should assign skill to employee', async () => {
-      const skillWithAssign = { ...mockSkill, assignments: [] };
+      const skillWithAssign = { ...mockSkill, assignments: [], save: jest.fn() };
       mockSkillModel.findById.mockResolvedValue(skillWithAssign);
-      mockEmployeeModel.findById.mockResolvedValue({ _id: 'e1', fullName: 'John' });
+      mockEmployeeModel.findById.mockResolvedValue({ _id: '507f1f77bcf86cd799439011', fullName: 'John' });
 
-      const result = await service.assign('s1', { employeeId: 'e1' });
+      const result = await service.assign('507f1f77bcf86cd799439011', { employeeId: '507f1f77bcf86cd799439011' });
       expect(result).toBeDefined();
     });
   });
