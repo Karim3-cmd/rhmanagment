@@ -126,8 +126,10 @@ describe('Skills', () => {
     vi.mocked(skillsApi.remove).mockResolvedValue({ message: 'deleted' });
     render(<Skills userRole="HR" />);
     await waitFor(() => screen.getByText('React'));
-    const deleteButtons = screen.getAllByTitle('');
-    fireEvent.click(screen.getAllByRole('button').find(b => b.querySelector('.lucide-trash-2'))!);
+    // Find all buttons and click the trash icon button for the first skill
+    const allButtons = screen.getAllByRole('button');
+    const trashButton = allButtons.find(b => b.querySelector('.lucide-trash-2'));
+    fireEvent.click(trashButton!);
     await waitFor(() => expect(skillsApi.remove).toHaveBeenCalled());
   });
 
