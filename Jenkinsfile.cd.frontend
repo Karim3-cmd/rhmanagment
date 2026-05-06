@@ -89,14 +89,14 @@ pipeline {
                           -v "$PWD":/workspace \
                           -v "$KUBECONFIG_FILE":/kubeconfig:ro \
                           -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:1.30 \
+                          bitnami/kubectl:latest \
                           apply -f /workspace/${K8S_DIR}/namespace.yaml
 
                         docker run --rm \
                           -v "$PWD":/workspace \
                           -v "$KUBECONFIG_FILE":/kubeconfig:ro \
                           -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:1.30 \
+                          bitnami/kubectl:latest \
                           apply -f /workspace/${K8S_DIR}/apps/frontend-service.yaml
 
                         sed "s#__FRONTEND_IMAGE__#${IMAGE_NAME}:${IMAGE_TAG}#g" ${K8S_DIR}/apps/frontend-deployment.yaml > /tmp/frontend-deployment.yaml
@@ -105,27 +105,27 @@ pipeline {
                           -v /tmp/frontend-deployment.yaml:/manifest.yaml:ro \
                           -v "$KUBECONFIG_FILE":/kubeconfig:ro \
                           -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:1.30 \
+                          bitnami/kubectl:latest \
                           apply -f /manifest.yaml
 
                         docker run --rm \
                           -v "$KUBECONFIG_FILE":/kubeconfig:ro \
                           -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:1.30 \
+                          bitnami/kubectl:latest \
                           -n ${K8S_NAMESPACE} rollout status deployment/hrbrain-frontend --timeout=180s
 
                         docker run --rm \
                           -v "$PWD":/workspace \
                           -v "$KUBECONFIG_FILE":/kubeconfig:ro \
                           -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:1.30 \
+                          bitnami/kubectl:latest \
                           apply -f /workspace/${K8S_DIR}/network/ingress.yaml
 
                         docker run --rm \
                           -v "$PWD":/workspace \
                           -v "$KUBECONFIG_FILE":/kubeconfig:ro \
                           -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:1.30 \
+                          bitnami/kubectl:latest \
                           apply -f /workspace/${K8S_DIR}/network/network-policies.yaml
                     '''
                 }
