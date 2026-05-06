@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import axios from 'axios';
 
-// Mock axios.create to return a mock instance
-const mockAxiosInstance = {
+// vi.hoisted ensures mockAxiosInstance is available when vi.mock is hoisted
+const mockAxiosInstance = vi.hoisted(() => ({
   get: vi.fn(),
   post: vi.fn(),
   patch: vi.fn(),
@@ -11,7 +10,7 @@ const mockAxiosInstance = {
     request: { use: vi.fn() },
     response: { use: vi.fn() },
   },
-};
+}));
 
 vi.mock('axios', () => ({
   default: {
@@ -19,7 +18,6 @@ vi.mock('axios', () => ({
   },
 }));
 
-// Import after mock setup
 import {
   getToken,
   setToken,
@@ -30,7 +28,6 @@ import {
   skillsApi,
   notificationsApi,
   settingsApi,
-  api,
 } from './api';
 
 describe('Token utilities', () => {
