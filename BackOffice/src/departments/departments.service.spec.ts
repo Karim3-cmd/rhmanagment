@@ -14,6 +14,17 @@ const mockDept = {
   toObject: jest.fn().mockReturnValue({ _id: 'd1', name: 'IT', description: 'Tech team', members: [] }),
 };
 
+// departmentModel.find() is called in two ways:
+// 1. syncMembers(): await this.departmentModel.find() → needs to return array directly
+// 2. findAll(): await this.departmentModel.find().sort(...) → needs .sort()
+// Solution: return a real array with .sort() attached so it is iterable and chainable
+const createFindMock = (items: any[]) => {
+  const arr = [...items];
+  return Object.assign(arr, {
+    sort: jest.fn().mockResolvedValue(items),
+  });
+};
+
 const mockDepartmentModel = {
   findOne: jest.fn(),
   find: jest.fn(),
@@ -25,14 +36,6 @@ const mockDepartmentModel = {
 
 const mockEmployeeModel = {
   find: jest.fn(),
-};
-
-const resetMocks = () => {
-  mockEmployeeModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
-  mockDepartmentModel.find.mockReturnValue({
-    sort: jest.fn().mockResolvedValue([mockDept]),
-    lean: jest.fn().mockResolvedValue([mockDept]),
-  });
 };
 
 describe('DepartmentsService', () => {
@@ -49,7 +52,9 @@ describe('DepartmentsService', () => {
 
     service = module.get<DepartmentsService>(DepartmentsService);
     jest.clearAllMocks();
-    resetMocks();
+    // Default: find returns array-like with .sort() support
+    mockDepartmentModel.find.mockReturnValue(createFindMock([mockDept]));
+    mockEmployeeModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
   });
 
   describe('create', () => {
@@ -76,9 +81,7 @@ describe('DepartmentsService', () => {
     });
 
     it('should return empty list when no departments', async () => {
-      mockDepartmentModel.find.mockReturnValue({
-        sort: jest.fn().mockResolvedValue([]),
-      });
+      mockDepartmentModel.find.mockReturnValue(createFindMock([]));
       mockEmployeeModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
 
       const result = await service.findAll();

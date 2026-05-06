@@ -128,7 +128,7 @@ describe('SkillsService', () => {
   describe('remove', () => {
     it('should delete a skill', async () => {
       mockSkillModel.findByIdAndDelete.mockResolvedValue(mockSkill);
-      mockSkillModel.find.mockResolvedValue([]);
+      mockSkillModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
 
       const result = await service.remove('s1');
       expect(result.message).toBe('Skill deleted successfully');
