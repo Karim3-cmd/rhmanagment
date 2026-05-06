@@ -77,7 +77,7 @@ pipeline {
                           -Dsonar.sources=src \
                           -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/coverage/**,**/*.d.ts,**/test/**" \
                           -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                          -Dsonar.typescript.tsconfigPath="" \
+                          -Dsonar.typescript.tsconfigPath=tsconfig.sonar.json \
                           -Dsonar.javascript.environments=node
                     '''
                 }
