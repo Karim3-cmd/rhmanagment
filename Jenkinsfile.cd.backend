@@ -22,8 +22,6 @@ pipeline {
         IMAGE_NAME           = "${REGISTRY_CREDENTIALS_USR}/hrbrain-backend"
         IMAGE_TAG            = "${params.GIT_COMMIT_SHA ?: env.GIT_COMMIT}"
         BACKEND_DIR          = 'BackOffice'
-        K8S_DIR              = 'devops/kubernetes'
-        K8S_NAMESPACE        = 'hrbrain'
     }
 
     stages {
@@ -32,10 +30,8 @@ pipeline {
                 script {
                     if (!fileExists("${env.BACKEND_DIR}/Dockerfile") && fileExists('BackOffice/Dockerfile')) {
                         env.BACKEND_DIR = 'BackOffice'
-                        env.K8S_DIR = 'devops/kubernetes'
                     }
                     echo "Backend directory: ${env.BACKEND_DIR}"
-                    echo "Kubernetes directory: ${env.K8S_DIR}"
                 }
             }
         }
@@ -68,58 +64,14 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy to kubeadm') {
-            steps {
-                withCredentials([file(credentialsId: 'KUBECONFIG_PROD', variable: 'KUBECONFIG_FILE')]) {
-                    sh '''
-                        docker run --rm \
-                          -v "$PWD":/workspace \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          apply -f /workspace/${K8S_DIR}/namespace.yaml
-
-                        docker run --rm \
-                          -v "$PWD":/workspace \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          apply -f /workspace/${K8S_DIR}/apps/mongodb.yaml
-
-                        docker run --rm \
-                          -v "$PWD":/workspace \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          apply -f /workspace/${K8S_DIR}/apps/backend-service.yaml
-
-                        sed "s#__BACKEND_IMAGE__#${IMAGE_NAME}:${IMAGE_TAG}#g" ${K8S_DIR}/apps/backend-deployment.yaml > /tmp/backend-deployment.yaml
-
-                        docker run --rm \
-                          -v /tmp/backend-deployment.yaml:/manifest.yaml:ro \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          apply -f /manifest.yaml
-
-                        docker run --rm \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          -n ${K8S_NAMESPACE} rollout status deployment/hrbrain-backend --timeout=180s
-                    '''
-                }
-            }
-        }
     }
 
     post {
         success {
-            echo "✅ CD Backend réussi — image ${IMAGE_NAME}:${IMAGE_TAG} déployée sur kubeadm."
+            echo "✅ CD Backend réussi — image ${IMAGE_NAME}:${IMAGE_TAG} pushée sur Docker Hub."
         }
         failure {
-            echo '❌ CD Backend échoué — image non déployée ou rollout bloqué.'
+            echo '❌ CD Backend échoué.'
         }
         always {
             cleanWs()
