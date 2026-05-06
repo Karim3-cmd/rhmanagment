@@ -16,7 +16,7 @@ const mockDept = {
 
 const mockDepartmentModel = {
   findOne: jest.fn(),
-  find: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([mockDept]) }),
+  find: jest.fn(),
   findById: jest.fn(),
   findByIdAndUpdate: jest.fn(),
   findByIdAndDelete: jest.fn(),
@@ -24,7 +24,15 @@ const mockDepartmentModel = {
 };
 
 const mockEmployeeModel = {
-  find: jest.fn().mockReturnValue({ lean: jest.fn().mockResolvedValue([]) }),
+  find: jest.fn(),
+};
+
+const resetMocks = () => {
+  mockEmployeeModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+  mockDepartmentModel.find.mockReturnValue({
+    sort: jest.fn().mockResolvedValue([mockDept]),
+    lean: jest.fn().mockResolvedValue([mockDept]),
+  });
 };
 
 describe('DepartmentsService', () => {
@@ -41,15 +49,13 @@ describe('DepartmentsService', () => {
 
     service = module.get<DepartmentsService>(DepartmentsService);
     jest.clearAllMocks();
-    mockEmployeeModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
-    mockDepartmentModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([mockDept]) });
+    resetMocks();
   });
 
   describe('create', () => {
     it('should create a department successfully', async () => {
       mockDepartmentModel.findOne.mockResolvedValue(null);
       mockDepartmentModel.create.mockResolvedValue(mockDept);
-      mockDepartmentModel.find.mockResolvedValue([mockDept]);
 
       const result = await service.create({ name: 'IT', description: 'Tech' });
       expect(result.name).toBe('IT');
@@ -64,15 +70,16 @@ describe('DepartmentsService', () => {
 
   describe('findAll', () => {
     it('should return all departments', async () => {
-      mockDepartmentModel.find.mockResolvedValue([mockDept]);
-
       const result = await service.findAll();
       expect(result.total).toBe(1);
       expect(result.items).toHaveLength(1);
     });
 
     it('should return empty list when no departments', async () => {
-      mockDepartmentModel.find.mockResolvedValue([]);
+      mockDepartmentModel.find.mockReturnValue({
+        sort: jest.fn().mockResolvedValue([]),
+      });
+      mockEmployeeModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
 
       const result = await service.findAll();
       expect(result.total).toBe(0);
@@ -97,7 +104,6 @@ describe('DepartmentsService', () => {
   describe('update', () => {
     it('should update a department', async () => {
       mockDepartmentModel.findByIdAndUpdate.mockResolvedValue(mockDept);
-      mockDepartmentModel.find.mockResolvedValue([mockDept]);
 
       const result = await service.update('d1', { name: 'IT Updated' });
       expect(result).toBeDefined();
