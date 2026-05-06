@@ -23,8 +23,6 @@ pipeline {
         IMAGE_NAME           = "${REGISTRY_CREDENTIALS_USR}/hrbrain-frontend"
         IMAGE_TAG            = "${params.GIT_COMMIT_SHA ?: env.GIT_COMMIT}"
         FRONTEND_DIR         = 'FrontOffice'
-        K8S_DIR              = 'devops/kubernetes'
-        K8S_NAMESPACE        = 'hrbrain'
     }
 
     stages {
@@ -33,10 +31,8 @@ pipeline {
                 script {
                     if (!fileExists("${env.FRONTEND_DIR}/Dockerfile") && fileExists('FrontOffice/Dockerfile')) {
                         env.FRONTEND_DIR = 'FrontOffice'
-                        env.K8S_DIR = 'devops/kubernetes'
                     }
                     echo "Frontend directory: ${env.FRONTEND_DIR}"
-                    echo "Kubernetes directory: ${env.K8S_DIR}"
                 }
             }
         }
@@ -70,75 +66,14 @@ pipeline {
                 }
             }
         }
-
-        stage('Deploy to kubeadm') {
-            when {
-                expression {
-                    try {
-                        withCredentials([file(credentialsId: 'KUBECONFIG_PROD', variable: 'KUBECONFIG_TEST')]) { return true }
-                    } catch (e) {
-                        echo '⚠️ KUBECONFIG_PROD not configured — skipping deploy stage.'
-                        return false
-                    }
-                }
-            }
-            steps {
-                withCredentials([file(credentialsId: 'KUBECONFIG_PROD', variable: 'KUBECONFIG_FILE')]) {
-                    sh '''
-                        docker run --rm \
-                          -v "$PWD":/workspace \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          apply -f /workspace/${K8S_DIR}/namespace.yaml
-
-                        docker run --rm \
-                          -v "$PWD":/workspace \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          apply -f /workspace/${K8S_DIR}/apps/frontend-service.yaml
-
-                        sed "s#__FRONTEND_IMAGE__#${IMAGE_NAME}:${IMAGE_TAG}#g" ${K8S_DIR}/apps/frontend-deployment.yaml > /tmp/frontend-deployment.yaml
-
-                        docker run --rm \
-                          -v /tmp/frontend-deployment.yaml:/manifest.yaml:ro \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          apply -f /manifest.yaml
-
-                        docker run --rm \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          -n ${K8S_NAMESPACE} rollout status deployment/hrbrain-frontend --timeout=180s
-
-                        docker run --rm \
-                          -v "$PWD":/workspace \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          apply -f /workspace/${K8S_DIR}/network/ingress.yaml
-
-                        docker run --rm \
-                          -v "$PWD":/workspace \
-                          -v "$KUBECONFIG_FILE":/kubeconfig:ro \
-                          -e KUBECONFIG=/kubeconfig \
-                          bitnami/kubectl:latest \
-                          apply -f /workspace/${K8S_DIR}/network/network-policies.yaml
-                    '''
-                }
-            }
-        }
     }
 
     post {
         success {
-            echo "✅ CD Frontend réussi — image ${IMAGE_NAME}:${IMAGE_TAG} buildée et pushée sur Docker Hub."
+            echo "✅ CD Frontend réussi — image ${IMAGE_NAME}:${IMAGE_TAG} pushée sur Docker Hub."
         }
         failure {
-            echo '❌ CD Frontend échoué — image non déployée ou rollout bloqué.'
+            echo '❌ CD Frontend échoué.'
         }
         always {
             cleanWs()
