@@ -91,7 +91,7 @@ pipeline {
                 if (env.BRANCH_NAME == 'main' || env.GIT_BRANCH == 'origin/main' ||
                     env.BRANCH_NAME == 'master' || env.GIT_BRANCH == 'origin/master') {
                     echo '✅ CI Frontend réussi — déclenchement du CD Frontend...'
-                    build job: 'cd-frontend',
+                    build job: 'front-cd',
                           parameters: [string(name: 'GIT_COMMIT_SHA', value: env.GIT_COMMIT)],
                           wait: false
                 } else {
