@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
             image 'node:20'
-            args '-u root'
+            args '-u root --dns 8.8.8.8'
         }
     }
 
@@ -67,7 +67,7 @@ pipeline {
                         npm install -g sonarqube-scanner --no-audit --no-fund
                         sonar-scanner \
                           -Dsonar.host.url=${SONAR_HOST_URL} \
-                          -Dsonar.login=${SONAR_TOKEN}
+                          -Dsonar.token=${SONAR_TOKEN}
                     '''
                 }
             }
