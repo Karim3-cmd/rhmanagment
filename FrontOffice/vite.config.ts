@@ -31,7 +31,14 @@ export default defineConfig({
       reporter: ['text', 'lcov', 'html'],
       reportsDirectory: './coverage',
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/test/**', 'src/**/*.d.ts'],
+      exclude: [
+        'src/test/**',
+        'src/**/*.d.ts',
+        'src/app/components/ui/**',
+        'src/app/components/figma/**',
+        'src/styles/**',
+        'src/main.tsx',
+      ],
     },
     reporters: ['default', 'junit'],
     outputFile: {
