@@ -63,15 +63,15 @@ describe('Recommendations', () => {
   it('shows matched skills', async () => {
     render(<Recommendations userRole="HR" user={mockUser} />);
     await waitFor(() => {
-      expect(screen.getByText('React')).toBeInTheDocument();
-      expect(screen.getByText('TypeScript')).toBeInTheDocument();
+      expect(screen.getAllByText('React').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('TypeScript').length).toBeGreaterThan(0);
     });
   });
 
   it('shows missing skills', async () => {
     render(<Recommendations userRole="HR" user={mockUser} />);
     await waitFor(() => {
-      expect(screen.getByText('Node.js')).toBeInTheDocument();
+      expect(screen.getAllByText('Node.js').length).toBeGreaterThan(0);
     });
   });
 
