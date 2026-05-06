@@ -44,7 +44,10 @@ describe('SkillsService', () => {
     service = module.get<SkillsService>(SkillsService);
     jest.clearAllMocks();
     mockEmployeeModel.find.mockReturnValue({ select: jest.fn().mockResolvedValue([]) });
-    mockSkillModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]), sort: jest.fn().mockResolvedValue([]) });
+    mockSkillModel.find.mockReturnValue({
+      lean: jest.fn().mockResolvedValue([]),
+      sort: jest.fn().mockResolvedValue([]),
+    });
   });
 
   describe('create', () => {

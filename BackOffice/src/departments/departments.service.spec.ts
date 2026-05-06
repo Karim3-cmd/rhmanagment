@@ -16,7 +16,7 @@ const mockDept = {
 
 const mockDepartmentModel = {
   findOne: jest.fn(),
-  find: jest.fn(),
+  find: jest.fn().mockReturnValue({ sort: jest.fn().mockResolvedValue([mockDept]) }),
   findById: jest.fn(),
   findByIdAndUpdate: jest.fn(),
   findByIdAndDelete: jest.fn(),
@@ -42,6 +42,7 @@ describe('DepartmentsService', () => {
     service = module.get<DepartmentsService>(DepartmentsService);
     jest.clearAllMocks();
     mockEmployeeModel.find.mockReturnValue({ lean: jest.fn().mockResolvedValue([]) });
+    mockDepartmentModel.find.mockReturnValue({ sort: jest.fn().mockResolvedValue([mockDept]) });
   });
 
   describe('create', () => {
