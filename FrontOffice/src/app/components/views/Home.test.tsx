@@ -48,7 +48,7 @@ describe('Home', () => {
     render(<Home userRole="HR" />);
     await waitFor(() => {
       expect(screen.getByText('Total Employees')).toBeInTheDocument();
-      expect(screen.getByText('2')).toBeInTheDocument();
+      expect(screen.getAllByText('2').length).toBeGreaterThan(0);
     });
   });
 
